@@ -24,6 +24,7 @@ Gera o `Kitty.app` (Apple Silicon), assina localmente e copia para `/Application
 - **Global Privacy Control** — envia `Sec-GPC: 1` e `DNT: 1` em todas as requisições
 - **Histórico** — `kitty://history`, agrupado por dia, com busca e remoção
 - **Nova aba** — busca DuckDuckGo, total de bloqueios e sites recentes
+- **Vídeos com DRM** — usa o Electron da Castlabs (com Widevine), então Crunchyroll, Netflix, Disney+ etc. conseguem tocar
 - Página de erro própria e tema claro/escuro automático
 
 ## Atalhos

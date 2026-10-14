@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const {
   app,
+  components,
   BrowserWindow,
   WebContentsView,
   Menu,
@@ -535,6 +536,12 @@ function zoom(delta) {
 // ---------------------------------------------------------------------------
 
 app.whenReady().then(async () => {
+  // Castlabs Electron ships Widevine as a component; DRM video (Crunchyroll,
+  // Netflix, Disney+…) only plays once it is installed and ready.
+  if (components) {
+    await components.whenReady().catch((err) => console.error('[kitty] Widevine indisponível:', err));
+  }
+
   const userData = app.getPath('userData');
   settings = new Store(path.join(userData, 'settings.json'), { allowlist: [], blockedTotal: 0 });
   history = new Store(path.join(userData, 'history.json'), { entries: [] });

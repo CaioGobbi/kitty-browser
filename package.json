@@ -7,14 +7,15 @@
   "scripts": {
     "start": "electron .",
     "icon": "electron scripts/build-icon.js",
-    "dist": "electron-packager . Kitty --platform=darwin --arch=arm64 --out=out --overwrite --icon=assets/icon.icns --app-bundle-id=app.kitty.browser --app-category-type=public.app-category.productivity --app-copyright='Kitty' --ignore='^/(out|scripts|assets|README.md|\\.gitignore)'",
+    "dist": "electron-packager . Kitty --download.mirrorOptions.mirror=https://github.com/castlabs/electron-releases/releases/download/ --platform=darwin --arch=arm64 --out=out --overwrite --icon=assets/icon.icns --app-bundle-id=app.kitty.browser --app-category-type=public.app-category.productivity --app-copyright='Kitty' --ignore='^/(out|scripts|assets|README.md|\\.gitignore)'",
     "postdist": "codesign --force --deep --sign - out/Kitty-darwin-arm64/Kitty.app",
-    "install-app": "npm run dist && rm -rf /Applications/Kitty.app && cp -R out/Kitty-darwin-arm64/Kitty.app /Applications/"
+    "install-app": "npm run dist && rm -rf /Applications/Kitty.app && cp -R out/Kitty-darwin-arm64/Kitty.app /Applications/",
+    "postinstall": "node node_modules/electron/install.js"
   },
   "license": "MPL-2.0",
   "devDependencies": {
     "@electron/packager": "^20.3.0",
-    "electron": "44.4.5"
+    "electron": "github:castlabs/electron-releases#v44.1.0+wvcus"
   },
   "dependencies": {
     "@ghostery/adblocker-electron": "2.18.2"
