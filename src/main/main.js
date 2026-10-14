@@ -3,392 +3,41 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
-const {
-  app,
-  components,
-  BrowserWindow,
-  WebContentsView,
-  Menu,
-  ipcMain,
-  net,
-  protocol,
-  session,
-} = require('electron');
-const { ElectronBlocker, Request, fromElectronDetails } = require('@ghostery/adblocker-electron');
+const { app, components, ipcMain, net, protocol, session, shell } = require('electron');
 
-const { Store } = require('./store');
+const { data, initData, flushData, engine, hostOf, isInternal, SEARCH_ENGINES, EDITABLE_SETTINGS } = require('./data');
+const { registry } = require('./registry');
+const privacy = require('./privacy');
+const downloads = require('./downloads');
+const menus = require('./menus');
+const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 
 app.setName('Kitty');
+// A throwaway profile for development and tests: KITTY_PROFILE=/tmp/x npm start
+if (process.env.KITTY_PROFILE) app.setPath('userData', path.resolve(process.env.KITTY_PROFILE));
 
 const PAGES_DIR = path.join(__dirname, '..', 'pages');
-const UI_DIR = path.join(__dirname, '..', 'ui');
-const CHROME_HEIGHT = 84; // tab strip (40) + toolbar (44)
-const NEW_TAB_URL = 'kitty://newtab';
-const SEARCH_URL = 'https://duckduckgo.com/?q=';
-const HISTORY_LIMIT = 5000;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'kitty', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
-/** @type {Store} */ let settings;
-/** @type {Store} */ let history;
-/** @type {ElectronBlocker | null} */ let blocker = null;
-/** @type {BrowserWindow | null} */ let win = null;
-
-/**
- * @typedef {{ id: number, view: WebContentsView, blocked: Set<string>, favicon: string | null }} Tab
- * @type {Map<number, Tab>}
- */
-const tabs = new Map();
-let tabOrder = [];
-let activeTabId = null;
+let quitting = false;
+let ready = false;
+/** Links macOS asked us to open before the app was ready. */
+const pendingUrls = [];
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Profiles: the persistent one and each private window's in-memory session
 
-function hostOf(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return '';
-  }
+function setupProfile(ses, { isPrivate }) {
+  registerKittyProtocol(ses);
+  privacy.setupSession(ses);
+  downloads.attach(ses, { isPrivate });
 }
-
-function isInternal(url) {
-  return typeof url === 'string' && url.startsWith('kitty://');
-}
-
-function isShieldUp(url) {
-  const host = hostOf(url);
-  return !settings.get('allowlist').includes(host);
-}
-
-/** Turns whatever the user typed in the address bar into a URL. */
-function resolveInput(input) {
-  const text = String(input || '').trim();
-  if (!text) return NEW_TAB_URL;
-  if (/^(https?|kitty|file):\/\//i.test(text) || /^about:/i.test(text)) return text;
-  if (/^localhost(:\d+)?(\/|$)/i.test(text) || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/|$)/.test(text)) {
-    return `http://${text}`;
-  }
-  if (!/\s/.test(text) && /^[^/]+\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(text)) return `https://${text}`;
-  return SEARCH_URL + encodeURIComponent(text);
-}
-
-// ---------------------------------------------------------------------------
-// Tabs
-
-function tabState(tab) {
-  const wc = tab.view.webContents;
-  const url = wc.getURL();
-  return {
-    id: tab.id,
-    title: wc.getTitle() || (isInternal(url) ? 'Nova aba' : url),
-    url,
-    favicon: tab.favicon,
-    loading: wc.isLoading(),
-    canGoBack: wc.navigationHistory.canGoBack(),
-    canGoForward: wc.navigationHistory.canGoForward(),
-    blocked: tab.blocked.size,
-    shieldUp: isInternal(url) ? true : isShieldUp(url),
-    internal: isInternal(url),
-  };
-}
-
-function sendState() {
-  if (!win || win.isDestroyed()) return;
-  win.webContents.send('tabs:state', {
-    activeTabId,
-    tabs: tabOrder.map((id) => tabState(tabs.get(id))),
-  });
-}
-
-let stateTimer = null;
-/** Coalesces bursts of updates (e.g. many blocked requests) into one UI message. */
-function sendStateSoon() {
-  if (stateTimer) return;
-  stateTimer = setTimeout(() => {
-    stateTimer = null;
-    sendState();
-  }, 100);
-}
-
-function layoutActiveTab() {
-  if (!win || activeTabId == null) return;
-  const { width, height } = win.getContentBounds();
-  tabs.get(activeTabId).view.setBounds({
-    x: 0,
-    y: CHROME_HEIGHT,
-    width,
-    height: Math.max(0, height - CHROME_HEIGHT),
-  });
-}
-
-function recordHistory(wc) {
-  const url = wc.getURL();
-  if (!/^https?:/.test(url)) return;
-  const entries = history.get('entries');
-  const last = entries[0];
-  const title = wc.getTitle() || url;
-  if (last && last.url === url) {
-    last.title = title;
-  } else {
-    entries.unshift({ url, title, time: Date.now() });
-    if (entries.length > HISTORY_LIMIT) entries.length = HISTORY_LIMIT;
-  }
-  history.save();
-}
-
-/** Removes the failed page under the error page, so "back" skips it instead of failing again. */
-function dropFailedEntry(wc, errorUrl) {
-  const failedUrl = new URL(errorUrl).searchParams.get('url');
-  const nav = wc.navigationHistory;
-  const index = nav.getActiveIndex() - 1;
-  if (index >= 0 && nav.getEntryAtIndex(index)?.url === failedUrl) nav.removeEntryAtIndex(index);
-}
-
-function createTab(url = NEW_TAB_URL, { activate = true } = {}) {
-  const view = new WebContentsView({
-    webPreferences: {
-      partition: 'persist:kitty',
-      preload: path.join(__dirname, 'preload-page.js'),
-      contextIsolation: true,
-      sandbox: true,
-    },
-  });
-  view.setBackgroundColor('#00000000');
-  const wc = view.webContents;
-  const tab = { id: wc.id, view, blocked: new Set(), favicon: null };
-  tabs.set(tab.id, tab);
-
-  const insertAt = activeTabId != null ? tabOrder.indexOf(activeTabId) + 1 : tabOrder.length;
-  tabOrder.splice(insertAt, 0, tab.id);
-
-  wc.setWindowOpenHandler(({ url: target }) => {
-    createTab(target);
-    return { action: 'deny' };
-  });
-  wc.on('did-start-navigation', (details) => {
-    if (details.isMainFrame && !details.isSameDocument) {
-      tab.blocked.clear();
-      tab.favicon = null;
-    }
-    sendState();
-  });
-  wc.on('did-navigate', (_e, url) => {
-    if (url.startsWith('kitty://error')) dropFailedEntry(wc, url);
-    recordHistory(wc);
-    sendState();
-  });
-  wc.on('did-navigate-in-page', (_e, _url, isMainFrame) => {
-    if (isMainFrame) recordHistory(wc);
-    sendState();
-  });
-  wc.on('page-title-updated', () => {
-    recordHistory(wc);
-    sendState();
-  });
-  wc.on('page-favicon-updated', (_e, favicons) => {
-    tab.favicon = favicons[0] || null;
-    sendState();
-  });
-  wc.on('did-start-loading', sendState);
-  wc.on('did-stop-loading', sendState);
-  wc.on('did-fail-load', (_e, code, desc, failedUrl, isMainFrame) => {
-    if (!isMainFrame || code === -3) return; // -3 = aborted (e.g. user hit stop)
-    const params = new URLSearchParams({ url: failedUrl, reason: desc });
-    wc.loadURL(`kitty://error?${params}`).catch(() => {});
-  });
-
-  wc.loadURL(url).catch(() => {}); // failures are handled by did-fail-load
-  if (activate) switchTab(tab.id);
-  else sendState();
-  return tab;
-}
-
-function switchTab(id) {
-  if (!tabs.has(id) || !win) return;
-  if (activeTabId != null && tabs.has(activeTabId)) {
-    win.contentView.removeChildView(tabs.get(activeTabId).view);
-  }
-  activeTabId = id;
-  const tab = tabs.get(id);
-  win.contentView.addChildView(tab.view);
-  layoutActiveTab();
-  sendState();
-
-  if (isInternal(tab.view.webContents.getURL()) || tab.view.webContents.getURL() === '') {
-    focusAddressBar();
-  } else {
-    tab.view.webContents.focus();
-  }
-}
-
-function closeTab(id) {
-  const tab = tabs.get(id);
-  if (!tab) return;
-  const index = tabOrder.indexOf(id);
-  tabOrder.splice(index, 1);
-  tabs.delete(id);
-
-  if (tabOrder.length === 0) {
-    tab.view.webContents.close();
-    win.close();
-    return;
-  }
-  if (activeTabId === id) {
-    win.contentView.removeChildView(tab.view);
-    activeTabId = null;
-    switchTab(tabOrder[Math.min(index, tabOrder.length - 1)]);
-  }
-  tab.view.webContents.close();
-  sendState();
-}
-
-/** Reloads the page; on the error page, retries the address that failed. */
-function reloadActive() {
-  const wc = activeWebContents();
-  if (!wc) return;
-  const url = wc.getURL();
-  if (url.startsWith('kitty://error')) {
-    const failed = new URL(url).searchParams.get('url');
-    if (failed) return wc.loadURL(failed).catch(() => {});
-  }
-  wc.reload();
-}
-
-function activeWebContents() {
-  return activeTabId != null ? tabs.get(activeTabId)?.view.webContents : null;
-}
-
-function focusAddressBar() {
-  if (!win) return;
-  win.webContents.focus();
-  win.webContents.send('ui:focus-address');
-}
-
-// ---------------------------------------------------------------------------
-// Privacy: ad/tracker blocking + Global Privacy Control
-
-/**
- * Applies cosmetic filters to the frame that asked for them. Ghostery's own
- * handler runs scriptlets in the *main* frame for every iframe's request, so
- * pages with several iframes (Crunchyroll) got the same scriptlet stacked
- * until it overflowed the call stack and broke the page.
- */
-function injectCosmetics(event, url, msg) {
-  const frame = event.senderFrame;
-  if (!frame) return;
-  const { hostname, domain } = Request.fromRawDetails({ url });
-  const isFirstRun = msg === undefined; // later calls carry DOM info (classes, ids, hrefs)
-  const { active, styles, scripts } = blocker.getCosmeticsFilters({
-    url,
-    hostname,
-    domain: domain || '',
-    classes: msg?.classes,
-    hrefs: msg?.hrefs,
-    ids: msg?.ids,
-    getBaseRules: isFirstRun,
-    getInjectionRules: isFirstRun,
-    getExtendedRules: false,
-    getRulesFromHostname: isFirstRun,
-    getRulesFromDOM: !isFirstRun,
-    callerContext: { frameId: event.frameId, processId: event.processId, lifecycle: msg?.lifecycle },
-  });
-  if (active === false) return;
-
-  if (styles.length > 0) {
-    if (frame === event.sender.mainFrame) {
-      event.sender.insertCSS(styles, { cssOrigin: 'user' });
-    } else {
-      const css = JSON.stringify(styles);
-      frame
-        .executeJavaScript(
-          `(() => { const s = document.createElement('style'); s.textContent = ${css}; (document.head || document.documentElement).append(s); })()`,
-        )
-        .catch(() => {});
-    }
-  }
-  // Each scriptlet declares helpers (safeSelf, proxyApplyFn…) at top level. Run
-  // side by side in the page's global scope, a later scriptlet overwrites an
-  // earlier one's helpers and its Function.prototype.toString proxy recurses
-  // forever. Wrapping each one keeps its helpers private.
-  for (const script of scripts) {
-    frame.executeJavaScript(`(() => {\n${script}\n})();`, true).catch(() => {});
-  }
-}
-
-async function setupBlocker(ses) {
-  ses.webRequest.onBeforeRequest((details, callback) => {
-    if (!blocker || details.resourceType === 'mainFrame' || !details.webContentsId) {
-      return callback({});
-    }
-    const tab = tabs.get(details.webContentsId);
-    if (!tab || !isShieldUp(tab.view.webContents.getURL())) return callback({});
-
-    const { match, redirect } = blocker.match(fromElectronDetails(details));
-    if (!match && !redirect) return callback({});
-
-    // Count each URL once per page load: some sites retry blocked requests in a tight loop.
-    if (!tab.blocked.has(details.url)) {
-      tab.blocked.add(details.url);
-      settings.set('blockedTotal', settings.get('blockedTotal') + 1);
-      sendStateSoon();
-    }
-    callback(redirect ? { redirectURL: redirect.dataUrl } : { cancel: true });
-  });
-
-  ses.webRequest.onBeforeSendHeaders((details, callback) => {
-    callback({ requestHeaders: { ...details.requestHeaders, 'Sec-GPC': '1', DNT: '1' } });
-  });
-
-  // Cosmetic filtering: hides the empty boxes ads leave behind. The preload
-  // asks for the CSS/scriptlets of each frame; we skip sites with shields down.
-  ses.registerPreloadScript({
-    type: 'frame',
-    filePath: require.resolve('@ghostery/adblocker-electron-preload'),
-  });
-  ipcMain.handle('@ghostery/adblocker/inject-cosmetic-filters', (event, url, msg) => {
-    const tab = tabs.get(event.sender.id);
-    if (!blocker || !tab || !isShieldUp(tab.view.webContents.getURL())) return;
-    injectCosmetics(event, url, msg);
-  });
-  ipcMain.handle('@ghostery/adblocker/is-mutation-observer-enabled', (event) =>
-    blocker ? blocker.onIsMutationObserverEnabled(event) : false,
-  );
-
-  // Requests pass through untouched until the filter lists are ready.
-  const cachePath = path.join(app.getPath('userData'), 'adblock-engine.bin');
-  try {
-    blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
-      path: cachePath,
-      read: fs.promises.readFile,
-      write: fs.promises.writeFile,
-    });
-  } catch (err) {
-    console.error('[kitty] Não foi possível carregar as listas de bloqueio:', err);
-  }
-}
-
-function toggleShield() {
-  const wc = activeWebContents();
-  if (!wc || isInternal(wc.getURL())) return;
-  const host = hostOf(wc.getURL());
-  if (!host) return;
-  const allowlist = settings.get('allowlist');
-  settings.set(
-    'allowlist',
-    allowlist.includes(host) ? allowlist.filter((h) => h !== host) : [...allowlist, host],
-  );
-  wc.reload();
-}
-
-// ---------------------------------------------------------------------------
-// kitty:// internal pages
 
 function registerKittyProtocol(ses) {
-  const handler = (request) => {
+  ses.protocol.handle('kitty', (request) => {
     const url = new URL(request.url);
     const page = url.hostname;
     const file = url.pathname === '/' || url.pathname === '' ? `${page}.html` : url.pathname.slice(1);
@@ -397,218 +46,399 @@ function registerKittyProtocol(ses) {
       return new Response('Página não encontrada', { status: 404 });
     }
     return net.fetch(pathToFileURL(resolved).toString());
-  };
-  ses.protocol.handle('kitty', handler);
-}
-
-function fromInternalPage(event) {
-  return isInternal(event.senderFrame?.url);
-}
-
-function fromUI(event) {
-  return win && event.sender === win.webContents;
-}
-
-function registerIpc() {
-  // Browser chrome (tab strip + toolbar)
-  const ui = (channel, fn) =>
-    ipcMain.on(channel, (event, ...args) => {
-      if (fromUI(event)) fn(...args);
-    });
-  ui('tab:new', () => createTab());
-  ui('tab:close', (id) => closeTab(id ?? activeTabId));
-  ui('tab:switch', (id) => switchTab(id));
-  ui('nav:go', (input) => {
-    const wc = activeWebContents();
-    if (!wc) return;
-    wc.loadURL(resolveInput(input)).catch(() => {});
-    wc.focus();
-  });
-  ui('nav:back', () => activeWebContents()?.navigationHistory.goBack());
-  ui('nav:forward', () => activeWebContents()?.navigationHistory.goForward());
-  ui('nav:reload', reloadActive);
-  ui('nav:stop', () => activeWebContents()?.stop());
-  ui('shield:toggle', toggleShield);
-  ui('open:history', () => openInternal('kitty://history'));
-  ui('ui:ready', sendState);
-
-  // Internal pages (kitty://newtab, kitty://history)
-  ipcMain.handle('kitty:history', (event, query = '') => {
-    if (!fromInternalPage(event)) return [];
-    const q = String(query).toLowerCase();
-    const entries = history.get('entries');
-    const found = q
-      ? entries.filter((e) => e.title.toLowerCase().includes(q) || e.url.toLowerCase().includes(q))
-      : entries;
-    return found.slice(0, 500);
-  });
-  ipcMain.handle('kitty:history-remove', (event, time) => {
-    if (!fromInternalPage(event)) return;
-    history.set('entries', history.get('entries').filter((e) => e.time !== time));
-  });
-  ipcMain.handle('kitty:history-clear', (event) => {
-    if (!fromInternalPage(event)) return;
-    history.set('entries', []);
-  });
-  ipcMain.handle('kitty:stats', (event) => {
-    if (!fromInternalPage(event)) return null;
-    const recent = [];
-    const seen = new Set();
-    for (const e of history.get('entries')) {
-      const host = hostOf(e.url);
-      if (seen.has(host)) continue;
-      seen.add(host);
-      recent.push({ host, url: e.url, title: e.title });
-      if (recent.length === 8) break;
-    }
-    return { blockedTotal: settings.get('blockedTotal'), recent };
   });
 }
 
+// ---------------------------------------------------------------------------
+// Windows
+
+function newWindow(url) {
+  const kwin = new KittyWindow();
+  if (url) kwin.ui.webContents.once('did-finish-load', () => kwin.navigate(url));
+  return kwin;
+}
+
+function newPrivateWindow(url) {
+  const kwin = new KittyWindow({ isPrivate: true });
+  if (url) kwin.ui.webContents.once('did-finish-load', () => kwin.navigate(url));
+  return kwin;
+}
+
+/** Opens a kitty:// page, reusing a tab that already shows it. */
 function openInternal(url) {
-  const existing = tabOrder.find((id) => tabs.get(id).view.webContents.getURL().startsWith(url));
+  const kwin = registry.current() || newWindow();
+  const existing = kwin.order.find((id) => kwin.tabState(kwin.tabs.get(id)).url.startsWith(url));
   if (existing != null) {
-    switchTab(existing);
-    tabs.get(existing).view.webContents.reload();
+    kwin.switchTab(existing);
+    kwin.tabs.get(existing).view.webContents.reload();
   } else {
-    createTab(url);
+    kwin.createTab(url);
+  }
+}
+
+/** Links from other apps (Kitty as default browser) and .html files from Finder. */
+function openExternalUrl(url) {
+  if (!/^(https?|file):/i.test(url)) return;
+  if (!ready) return void pendingUrls.push(url);
+  const kwin = registry.current({ allowPrivate: false });
+  if (kwin) {
+    kwin.createTab(url);
+    kwin.win.focus();
+  } else {
+    const fresh = new KittyWindow();
+    fresh.ui.webContents.once('did-finish-load', () => fresh.navigate(url));
+  }
+}
+
+let sessionTimer = null;
+function persistSession() {
+  if (quitting) return;
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(saveSessionNow, 1000);
+}
+
+function saveSessionNow() {
+  clearTimeout(sessionTimer);
+  const windows = [...registry.windows].filter((w) => !w.isPrivate && w.order.length).map((w) => w.snapshot());
+  data.session.set('windows', windows);
+}
+
+// ---------------------------------------------------------------------------
+// Bookmarks
+
+function broadcastBookmarks() {
+  registry.broadcast('bookmarks:state', data.bookmarks.get('items'));
+  for (const w of registry.windows) w.sendState();
+}
+
+function toggleBookmark(kwin) {
+  const tab = kwin.activeTab();
+  if (!tab) return;
+  const { url, title, favicon } = kwin.tabState(tab);
+  if (!/^https?:/.test(url)) return;
+  const items = data.bookmarks.get('items');
+  const existing = items.find((b) => b.url === url);
+  data.bookmarks.set(
+    'items',
+    existing
+      ? items.filter((b) => b !== existing)
+      : [...items, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, url, title, favicon, time: Date.now() }],
+  );
+  broadcastBookmarks();
+}
+
+function removeBookmark(id) {
+  data.bookmarks.set('items', data.bookmarks.get('items').filter((b) => b.id !== id));
+  broadcastBookmarks();
+}
+
+// ---------------------------------------------------------------------------
+// Address bar suggestions
+
+function localSuggestions(query) {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const matches = (title, url) => {
+    const hay = `${title} ${url}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  };
+  const byUrl = new Map();
+  const now = Date.now();
+  for (const b of data.bookmarks.get('items')) {
+    if (matches(b.title, b.url)) byUrl.set(b.url, { url: b.url, title: b.title, score: 40, bookmark: true });
+  }
+  for (const e of data.history.get('entries')) {
+    if (!matches(e.title, e.url)) continue;
+    const entry = byUrl.get(e.url) || { url: e.url, title: e.title, score: 0, bookmark: false };
+    const ageDays = (now - e.time) / 86_400_000;
+    entry.score += 10 / (1 + ageDays); // frecency: recent and frequent visits weigh more
+    byUrl.set(e.url, entry);
+  }
+  const q = words[0];
+  for (const entry of byUrl.values()) {
+    const host = hostOf(entry.url);
+    if (host.startsWith(q)) entry.score += 60;
+    if (new URL(entry.url).pathname === '/') entry.score += 5;
+  }
+  return [...byUrl.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4)
+    .map(({ url, title, bookmark }) => ({ type: bookmark ? 'bookmark' : 'history', url, title }));
+}
+
+async function remoteSuggestions(query) {
+  const api = engine().suggest;
+  if (!api || !data.settings.get('searchSuggestions')) return [];
+  try {
+    const res = await fetch(api + encodeURIComponent(query), { signal: AbortSignal.timeout(1500) });
+    const body = await res.json();
+    const list = Array.isArray(body) && Array.isArray(body[1]) ? body[1] : [];
+    return list
+      .filter((s) => typeof s === 'string' && s.toLowerCase() !== query.toLowerCase())
+      .slice(0, 5)
+      .map((text) => ({ type: 'search', text }));
+  } catch {
+    return [];
   }
 }
 
 // ---------------------------------------------------------------------------
-// Window + menu
+// Settings
 
-function createWindow() {
-  win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 480,
-    minHeight: 320,
-    title: 'Kitty',
-    backgroundColor: '#17151c',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
-    trafficLightPosition: { x: 14, y: 13 },
-    titleBarOverlay: process.platform === 'darwin' ? false : { height: 40, color: '#00000000' },
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-ui.js'),
-      contextIsolation: true,
-      sandbox: true,
-    },
-  });
-
-  win.loadFile(path.join(UI_DIR, 'index.html'));
-  win.on('resize', layoutActiveTab);
-  win.on('closed', () => {
-    win = null;
-    tabs.clear();
-    tabOrder = [];
-    activeTabId = null;
-  });
-  win.webContents.once('did-finish-load', () => createTab());
+function isDefaultBrowser() {
+  return app.isDefaultProtocolClient('https') && app.isDefaultProtocolClient('http');
 }
 
-function buildMenu() {
-  const tabAt = (n) => () => {
-    const id = n === 9 ? tabOrder.at(-1) : tabOrder[n - 1];
-    if (id != null) switchTab(id);
+function settingsSnapshot() {
+  const s = data.settings;
+  return {
+    values: Object.fromEntries(Object.keys(EDITABLE_SETTINGS).map((k) => [k, s.get(k)])),
+    engines: Object.entries(SEARCH_ENGINES).map(([id, e]) => ({ id, name: e.name, suggest: !!e.suggest })),
+    allowlist: s.get('allowlist'),
+    permissions: privacy.permissionList(),
+    isDefaultBrowser: isDefaultBrowser(),
+    canBeDefault: app.isPackaged,
+    downloadsDir: app.getPath('downloads'),
+    version: app.getVersion(),
   };
-  const cycle = (delta) => () => {
-    if (tabOrder.length < 2) return;
-    const i = tabOrder.indexOf(activeTabId);
-    switchTab(tabOrder[(i + delta + tabOrder.length) % tabOrder.length]);
-  };
-
-  const template = [
-    ...(process.platform === 'darwin' ? [{ role: 'appMenu', label: 'Kitty' }] : []),
-    {
-      label: 'Arquivo',
-      submenu: [
-        { label: 'Nova aba', accelerator: 'CmdOrCtrl+T', click: () => (win ? createTab() : createWindow()) },
-        { label: 'Nova janela', accelerator: 'CmdOrCtrl+N', click: () => !win && createWindow() },
-        { label: 'Abrir local', accelerator: 'CmdOrCtrl+L', click: focusAddressBar },
-        { type: 'separator' },
-        { label: 'Fechar aba', accelerator: 'CmdOrCtrl+W', click: () => closeTab(activeTabId) },
-      ],
-    },
-    { role: 'editMenu', label: 'Editar' },
-    {
-      label: 'Visualizar',
-      submenu: [
-        { label: 'Recarregar', accelerator: 'CmdOrCtrl+R', click: reloadActive },
-        {
-          label: 'Ferramentas do desenvolvedor',
-          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
-          click: () => activeWebContents()?.toggleDevTools(),
-        },
-        { type: 'separator' },
-        { label: 'Ampliar', accelerator: 'CmdOrCtrl+Plus', click: () => zoom(0.5) },
-        { label: 'Reduzir', accelerator: 'CmdOrCtrl+-', click: () => zoom(-0.5) },
-        { label: 'Tamanho real', accelerator: 'CmdOrCtrl+0', click: () => zoom(0) },
-        { type: 'separator' },
-        { role: 'togglefullscreen', label: 'Tela cheia' },
-      ],
-    },
-    {
-      label: 'Histórico',
-      submenu: [
-        { label: 'Voltar', accelerator: 'CmdOrCtrl+[', click: () => activeWebContents()?.navigationHistory.goBack() },
-        { label: 'Avançar', accelerator: 'CmdOrCtrl+]', click: () => activeWebContents()?.navigationHistory.goForward() },
-        { type: 'separator' },
-        { label: 'Mostrar histórico', accelerator: 'CmdOrCtrl+Y', click: () => openInternal('kitty://history') },
-      ],
-    },
-    {
-      label: 'Abas',
-      submenu: [
-        { label: 'Próxima aba', accelerator: 'Ctrl+Tab', click: cycle(1) },
-        { label: 'Aba anterior', accelerator: 'Ctrl+Shift+Tab', click: cycle(-1) },
-        { type: 'separator' },
-        ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
-          label: n === 9 ? 'Última aba' : `Aba ${n}`,
-          accelerator: `CmdOrCtrl+${n}`,
-          click: tabAt(n),
-        })),
-      ],
-    },
-    { role: 'windowMenu', label: 'Janela' },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function zoom(delta) {
-  const wc = activeWebContents();
-  if (!wc) return;
-  wc.setZoomLevel(delta === 0 ? 0 : wc.getZoomLevel() + delta);
+function uiSettings() {
+  return {
+    showBookmarksBar: data.settings.get('showBookmarksBar'),
+    engineName: engine().name,
+  };
+}
+
+function broadcastSettings() {
+  registry.broadcast('settings:state', uiSettings());
+}
+
+async function clearBrowsingData(kinds) {
+  const ses = session.fromPartition('persist:kitty');
+  if (kinds.includes('history')) data.history.set('entries', []);
+  if (kinds.includes('cookies')) await ses.clearStorageData();
+  if (kinds.includes('cache')) await ses.clearCache();
+  if (kinds.includes('downloads')) downloads.clearFinished();
+}
+
+// ---------------------------------------------------------------------------
+// IPC
+
+/** Only lets kitty:// pages (optionally only some of them) use an API. */
+function fromPage(event, ...hosts) {
+  const url = event.senderFrame?.url;
+  if (!isInternal(url)) return false;
+  return hosts.length === 0 || hosts.includes(new URL(url).hostname);
+}
+
+function registerIpc() {
+  // ---- Browser UI (tab strip, toolbar, bars). Each call targets its window.
+  const ui = (channel, fn) =>
+    ipcMain.on(channel, (event, ...args) => {
+      const kwin = registry.byUi(event.sender);
+      if (kwin) fn(kwin, ...args);
+    });
+  ui('ui:ready', (w) => {
+    w.sendState();
+    w.sendUi('bookmarks:state', data.bookmarks.get('items'));
+    w.sendUi('downloads:state', downloads.list());
+    w.sendUi('settings:state', uiSettings());
+    w.sendUi('ui:fullscreen', w.win.isFullScreen());
+  });
+  ui('ui:chrome', (w, layout) => w.setChrome(layout || {}));
+  ui('tab:new', (w) => w.createTab());
+  ui('tab:close', (w, id) => w.closeTab(id ?? w.activeId));
+  ui('tab:switch', (w, id) => w.switchTab(id));
+  ui('tab:move', (w, id, index) => w.moveTab(id, Number(index)));
+  ui('tab:menu', (w, id) => menus.tabContextMenu(w, id));
+  ui('tab:mute', (w, id) => w.toggleMute(id));
+  ui('nav:go', (w, input) => w.navigate(input));
+  ui('nav:back', (w) => w.activeWebContents()?.navigationHistory.goBack());
+  ui('nav:forward', (w) => w.activeWebContents()?.navigationHistory.goForward());
+  ui('nav:reload', (w) => w.reload());
+  ui('nav:stop', (w) => w.activeWebContents()?.stop());
+  ui('shield:toggle', (w) => {
+    const wc = w.activeWebContents();
+    if (!wc || isInternal(wc.getURL())) return;
+    const host = hostOf(wc.getURL());
+    if (!host) return;
+    const allowlist = data.settings.get('allowlist');
+    data.settings.set('allowlist', allowlist.includes(host) ? allowlist.filter((h) => h !== host) : [...allowlist, host]);
+    wc.reload();
+  });
+  ui('open:internal', (_w, page) => {
+    if (['history', 'bookmarks', 'settings'].includes(page)) openInternal(`kitty://${page}`);
+  });
+  ui('window:private', () => newPrivateWindow());
+  ui('find:query', (w, { text, forward, next } = {}) => w.find(text, { forward: forward !== false, next: !!next }));
+  ui('find:stop', (w) => w.stopFind());
+  ui('perm:answer', (w, { tabId, promptId, allow } = {}) => w.answerPrompt(tabId, promptId, allow));
+  ui('bookmark:toggle', (w) => toggleBookmark(w));
+  ui('bookmark:open', (w, { id, newTab } = {}) => {
+    const b = data.bookmarks.get('items').find((x) => x.id === id);
+    if (!b) return;
+    if (newTab) w.createTab(b.url, { activate: false });
+    else w.navigate(b.url);
+  });
+  ui('bookmark:menu', (w, id) => menus.bookmarkContextMenu(w, id));
+  ui('downloads:action', (_w, { id, what } = {}) => downloads.action(id, what));
+  ui('downloads:clear', () => downloads.clearFinished());
+
+  ipcMain.handle('ui:suggest', async (event, query) => {
+    const kwin = registry.byUi(event.sender);
+    const text = String(query || '').trim().slice(0, 200);
+    if (!kwin || !text) return { query: text, items: [] };
+    const local = localSuggestions(text);
+    // Private windows don't send keystrokes to the search engine.
+    const remote = kwin.isPrivate ? [] : await remoteSuggestions(text);
+    return { query: text, items: [...local, ...remote] };
+  });
+
+  // ---- Internal pages
+  ipcMain.handle('kitty:context', (event) => {
+    if (!fromPage(event)) return null;
+    const found = registry.tabByWebContentsId(event.sender.id);
+    const e = engine();
+    return { isPrivate: !!found?.kwin.isPrivate, engineName: e.name, searchUrl: e.search };
+  });
+  ipcMain.handle('kitty:history', (event, query = '') => {
+    if (!fromPage(event, 'history')) return [];
+    const q = String(query).toLowerCase();
+    const entries = data.history.get('entries');
+    const found = q ? entries.filter((e) => e.title.toLowerCase().includes(q) || e.url.toLowerCase().includes(q)) : entries;
+    return found.slice(0, 500);
+  });
+  ipcMain.handle('kitty:history-remove', (event, time) => {
+    if (!fromPage(event, 'history')) return;
+    data.history.set('entries', data.history.get('entries').filter((e) => e.time !== time));
+  });
+  ipcMain.handle('kitty:history-clear', (event) => {
+    if (fromPage(event, 'history')) data.history.set('entries', []);
+  });
+  ipcMain.handle('kitty:stats', (event) => {
+    if (!fromPage(event, 'newtab')) return null;
+    const found = registry.tabByWebContentsId(event.sender.id);
+    const recent = [];
+    const seen = new Set();
+    if (!found?.kwin.isPrivate) {
+      for (const e of data.history.get('entries')) {
+        const host = hostOf(e.url);
+        if (seen.has(host)) continue;
+        seen.add(host);
+        recent.push({ host, url: e.url, title: e.title });
+        if (recent.length === 8) break;
+      }
+    }
+    return { blockedTotal: data.settings.get('blockedTotal'), recent };
+  });
+  ipcMain.handle('kitty:bookmarks', (event) => (fromPage(event, 'bookmarks') ? data.bookmarks.get('items') : []));
+  ipcMain.handle('kitty:bookmark-remove', (event, id) => {
+    if (fromPage(event, 'bookmarks')) removeBookmark(id);
+  });
+  ipcMain.handle('kitty:bookmark-rename', (event, id, title) => {
+    if (!fromPage(event, 'bookmarks')) return;
+    const items = data.bookmarks.get('items');
+    const b = items.find((x) => x.id === id);
+    if (!b) return;
+    b.title = String(title || '').slice(0, 300) || b.url;
+    data.bookmarks.set('items', items);
+    broadcastBookmarks();
+  });
+  ipcMain.handle('kitty:settings', (event) => (fromPage(event, 'settings') ? settingsSnapshot() : null));
+  ipcMain.handle('kitty:settings-set', (event, key, value) => {
+    if (!fromPage(event, 'settings') || !EDITABLE_SETTINGS[key]?.(value)) return settingsSnapshot();
+    data.settings.set(key, value);
+    broadcastSettings();
+    return settingsSnapshot();
+  });
+  ipcMain.handle('kitty:settings-allowlist-remove', (event, host) => {
+    if (!fromPage(event, 'settings')) return null;
+    data.settings.set('allowlist', data.settings.get('allowlist').filter((h) => h !== host));
+    for (const w of registry.windows) w.sendState();
+    return settingsSnapshot();
+  });
+  ipcMain.handle('kitty:settings-permission-remove', (event, origin, permission) => {
+    if (!fromPage(event, 'settings')) return null;
+    privacy.removePermission(String(origin), String(permission));
+    return settingsSnapshot();
+  });
+  ipcMain.handle('kitty:settings-clear', async (event, kinds) => {
+    if (!fromPage(event, 'settings') || !Array.isArray(kinds)) return null;
+    await clearBrowsingData(kinds.map(String));
+    return settingsSnapshot();
+  });
+  ipcMain.handle('kitty:settings-default-browser', (event) => {
+    if (!fromPage(event, 'settings')) return null;
+    if (app.isPackaged) {
+      app.setAsDefaultProtocolClient('http');
+      app.setAsDefaultProtocolClient('https');
+    }
+    return settingsSnapshot();
+  });
+  ipcMain.handle('kitty:settings-open-downloads', (event) => {
+    if (fromPage(event, 'settings')) shell.openPath(app.getPath('downloads'));
+  });
 }
 
 // ---------------------------------------------------------------------------
 
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  openExternalUrl(url);
+});
+
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  openExternalUrl(pathToFileURL(filePath).toString());
+});
+
 app.whenReady().then(async () => {
-  // Castlabs Electron ships Widevine as a component; DRM video (Crunchyroll,
-  // Netflix, Disney+…) only plays once it is installed and ready.
+  // Castlabs Electron ships Widevine as a component; DRM video only plays
+  // once it is installed and ready.
   if (components) {
     await components.whenReady().catch((err) => console.error('[kitty] Widevine indisponível:', err));
   }
 
-  const userData = app.getPath('userData');
-  settings = new Store(path.join(userData, 'settings.json'), { allowlist: [], blockedTotal: 0 });
-  history = new Store(path.join(userData, 'history.json'), { entries: [] });
+  initData(app.getPath('userData'));
+  downloads.loadLog();
 
   if (process.platform === 'darwin' && !app.isPackaged) {
     app.dock.setIcon(path.join(__dirname, '..', '..', 'assets', 'icon.png'));
   }
 
-  const ses = session.fromPartition('persist:kitty');
-  registerKittyProtocol(ses);
+  hooks.setupProfile = setupProfile;
+  hooks.onChange = persistSession;
+  hooks.contextMenu = menus.pageContextMenu;
+  Object.assign(menus.actions, {
+    newWindow,
+    newPrivateWindow,
+    openInternal,
+    toggleBookmark,
+    removeBookmark,
+    toggleBookmarksBar: () => {
+      data.settings.set('showBookmarksBar', !data.settings.get('showBookmarksBar'));
+      broadcastSettings();
+    },
+  });
+
+  setupProfile(session.fromPartition('persist:kitty'), { isPrivate: false });
+  privacy.registerPrivacyIpc();
   registerIpc();
-  buildMenu();
-  const ready = setupBlocker(ses);
-  createWindow();
-  await ready;
+  menus.buildAppMenu();
+  const blockerReady = privacy.loadBlocker();
+
+  const saved = data.settings.get('restoreSession') ? data.session.get('windows') : [];
+  if (saved.length) for (const restore of saved) new KittyWindow({ restore });
+  else new KittyWindow();
+
+  ready = true;
+  for (const url of pendingUrls.splice(0)) openExternalUrl(url);
 
   app.on('activate', () => {
-    if (!win) createWindow();
+    if (registry.windows.size === 0) new KittyWindow();
   });
+  await blockerReady;
 });
 
 app.on('window-all-closed', () => {
@@ -616,6 +446,9 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  settings?.flush();
-  history?.flush();
+  if (data.session && !quitting) saveSessionNow();
+  quitting = true;
+  flushData();
 });
+
+module.exports = { NEW_TAB_URL };

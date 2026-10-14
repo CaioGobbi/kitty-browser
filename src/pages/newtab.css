@@ -71,3 +71,10 @@ main {
   color: var(--muted);
   font-size: 12px;
 }
+#private-note {
+  max-width: 520px;
+  margin: -12px 0 0;
+  color: var(--muted);
+  text-align: center;
+}
+body.private { --accent: #b18cff; --accent-soft: rgb(177 140 255 / 0.16); }

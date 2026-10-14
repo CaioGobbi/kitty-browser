@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:" />
+    <title>Favoritos</title>
+    <link rel="stylesheet" href="pages.css" />
+    <link rel="stylesheet" href="history.css" />
+    <link rel="stylesheet" href="bookmarks.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Favoritos</h1>
+      </header>
+      <input id="filter" type="search" placeholder="Pesquisar nos favoritos" spellcheck="false" />
+      <div id="list"></div>
+      <p id="empty" hidden>Nenhum favorito ainda. Clique na estrela da barra de endereço (ou ⌘D) para salvar uma página.</p>
+    </main>
+    <script src="bookmarks.js"></script>
+  </body>
+</html>

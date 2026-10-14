@@ -1,36 +1,57 @@
 :root {
-  --bg: #17151c;
   --strip: #121016;
-  --tab: transparent;
   --tab-hover: #201d27;
   --tab-active: #2a2633;
   --field: #1f1c26;
   --field-focus: #2a2633;
+  --popup: #24212d;
+  --popup-hover: #322d3d;
   --text: #ece8f2;
   --muted: #9a93a8;
-  --line: #2e2a38;
+  --line: #3a3546;
   --accent: #ff7a45;
   --accent-soft: rgb(255 122 69 / 0.16);
   --ok: #4fd18b;
+  --warn: #ffb35c;
+  --danger: #ff6b6b;
+  --shadow: 0 12px 32px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.06);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f6f4f9;
+  :root:not(.private) {
     --strip: #e9e5ef;
     --tab-hover: #ddd8e5;
     --tab-active: #f6f4f9;
     --field: #e9e5ef;
     --field-focus: #ffffff;
+    --popup: #ffffff;
+    --popup-hover: #efebf4;
     --text: #1d1a24;
     --muted: #6c6578;
     --line: #d6d0df;
     --accent: #e85d27;
     --accent-soft: rgb(232 93 39 / 0.12);
     --ok: #18a05a;
+    --warn: #b86a00;
+    --danger: #d43c3c;
+    --shadow: 0 12px 32px rgb(40 20 60 / 0.18), 0 0 0 1px rgb(0 0 0 / 0.06);
     color-scheme: light;
   }
+}
+
+/* Private windows: always dark, violet tint */
+:root.private {
+  --strip: #160f22;
+  --tab-hover: #241935;
+  --tab-active: #2e2142;
+  --field: #22182f;
+  --field-focus: #2e2142;
+  --popup: #2a1f3b;
+  --popup-hover: #382a4e;
+  --line: #43355a;
+  --accent: #b18cff;
+  --accent-soft: rgb(177 140 255 / 0.18);
 }
 
 * {
@@ -40,9 +61,9 @@
 html,
 body {
   margin: 0;
-  height: 84px;
+  height: 100vh;
   overflow: hidden;
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
   font: 13px/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   user-select: none;
@@ -64,17 +85,27 @@ button {
   color: inherit;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .icon-btn {
+  position: relative;
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
+  flex: none;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  cursor: default;
   -webkit-app-region: no-drag;
+}
+.icon-btn.small {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
 }
 .icon-btn:hover:not(:disabled) {
   background: var(--tab-hover);
@@ -82,6 +113,30 @@ button {
 }
 .icon-btn:disabled {
   opacity: 0.35;
+}
+
+.btn {
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  font-weight: 500;
+}
+.btn:hover {
+  background: var(--tab-hover);
+}
+.btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #1a1020;
+}
+.btn.primary:hover {
+  filter: brightness(1.08);
+}
+
+#chrome {
+  background: var(--tab-active);
 }
 
 /* ---- Tab strip ---------------------------------------------------------- */
@@ -94,6 +149,9 @@ button {
   padding: 0 8px 0 84px; /* room for the macOS traffic lights */
   background: var(--strip);
   -webkit-app-region: drag;
+}
+body.fullscreen #tabstrip {
+  padding-left: 8px;
 }
 body.win #tabstrip,
 body.linux #tabstrip {
@@ -112,13 +170,12 @@ body.linux #tabstrip {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   width: 220px;
   min-width: 36px;
   flex: 0 1 220px;
   padding: 0 6px 0 12px;
   border-radius: 10px 10px 0 0;
-  background: var(--tab);
   color: var(--muted);
   -webkit-app-region: no-drag;
 }
@@ -128,6 +185,12 @@ body.linux #tabstrip {
 .tab.active {
   background: var(--tab-active);
   color: var(--text);
+  z-index: 1;
+}
+.tab.dragging {
+  z-index: 2;
+  transition: none;
+  opacity: 0.92;
 }
 .tab.active::before,
 .tab.active::after {
@@ -159,7 +222,7 @@ body.linux #tabstrip {
   height: 16px;
   border-radius: 3px;
 }
-.tab-icon .spinner {
+.spinner {
   width: 13px;
   height: 13px;
   border: 2px solid var(--accent-soft);
@@ -167,7 +230,7 @@ body.linux #tabstrip {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-.tab-icon .kitty {
+.kitty {
   width: 14px;
   height: 14px;
   color: var(--accent);
@@ -188,32 +251,42 @@ body.linux #tabstrip {
   mask-image: linear-gradient(90deg, #000 85%, transparent);
 }
 
+.tab-audio,
 .tab-close {
   display: grid;
   place-items: center;
   width: 20px;
   height: 20px;
   flex: none;
+  padding: 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--muted);
-  opacity: 0;
+}
+.tab-audio svg {
+  width: 14px;
+  height: 14px;
 }
 .tab-close svg {
   width: 10px;
   height: 10px;
   stroke-width: 2;
 }
+.tab-close {
+  opacity: 0;
+}
 .tab:hover .tab-close,
 .tab.active .tab-close {
   opacity: 1;
 }
+.tab-audio:hover,
 .tab-close:hover {
   background: var(--line);
   color: var(--text);
 }
 .tab.narrow .tab-title,
+.tab.narrow .tab-audio,
 .tab.narrow:not(.active) .tab-close {
   display: none;
 }
@@ -227,6 +300,22 @@ body.linux #tabstrip {
   align-self: stretch;
 }
 
+#private-badge {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+body.private #private-badge {
+  display: flex;
+}
+
 /* ---- Toolbar ------------------------------------------------------------ */
 
 #toolbar {
@@ -235,8 +324,6 @@ body.linux #tabstrip {
   gap: 4px;
   height: 44px;
   padding: 0 8px;
-  background: var(--tab-active);
-  border-bottom: 1px solid var(--line);
 }
 
 #reload .i-stop,
@@ -249,12 +336,13 @@ body.linux #tabstrip {
 
 #address-form {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   height: 32px;
   margin: 0 6px;
-  padding: 0 12px;
+  padding: 0 4px 0 12px;
   border-radius: 10px;
   background: var(--field);
   border: 1px solid transparent;
@@ -276,6 +364,7 @@ body.linux #tabstrip {
   height: 14px;
 }
 #site-icon[data-kind='lock'] .i-lock,
+#site-icon[data-kind='insecure'] .i-insecure,
 #site-icon[data-kind='search'] .i-search,
 #site-icon[data-kind='kitty'] .i-kitty {
   display: block;
@@ -283,9 +372,22 @@ body.linux #tabstrip {
 #site-icon[data-kind='lock'] {
   color: var(--ok);
 }
+#site-icon[data-kind='insecure'] {
+  color: var(--warn);
+}
 #site-icon .i-kitty {
   fill: var(--accent);
   stroke: none;
+}
+#insecure-label {
+  display: none;
+  flex: none;
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 600;
+}
+#address-form[data-kind='insecure']:not(:focus-within) #insecure-label {
+  display: block;
 }
 
 #address {
@@ -303,8 +405,14 @@ body.linux #tabstrip {
   color: var(--muted);
 }
 
+#star.on {
+  color: var(--accent);
+}
+#star.on svg {
+  fill: var(--accent);
+}
+
 .shield {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -339,11 +447,305 @@ body.linux #tabstrip {
   opacity: 0.5;
 }
 #shield-count {
-  min-width: 0;
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 #shield-count:empty {
   display: none;
+}
+
+#downloads-btn .ring {
+  position: absolute;
+  inset: 0;
+  width: 30px;
+  height: 30px;
+  display: none;
+  transform: rotate(-90deg);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 81.7;
+  stroke-dashoffset: calc(81.7 * (1 - var(--progress, 0)));
+}
+#downloads-btn.active {
+  color: var(--accent);
+}
+#downloads-btn.active .ring {
+  display: block;
+}
+#downloads-btn.bump {
+  animation: bump 0.5s ease;
+}
+@keyframes bump {
+  40% {
+    transform: translateY(3px);
+    color: var(--accent);
+  }
+}
+
+/* ---- Bookmarks bar + info bars ------------------------------------------ */
+
+#bookmarks-bar {
+  display: flex;
+  gap: 2px;
+  height: 30px;
+  padding: 0 8px 3px;
+  overflow: hidden;
+}
+.bookmark {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  flex: none;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+}
+.bookmark:hover {
+  background: var(--tab-hover);
+}
+.bookmark img,
+.bookmark .letter {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 3px;
+}
+.bookmark .letter {
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.bookmark span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.infobar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+  background: var(--tab-active);
+}
+.infobar .spacer {
+  flex: 1;
+}
+#perm-bar > svg {
+  color: var(--warn);
+}
+#perm-text strong {
+  font-weight: 600;
+}
+#find-input {
+  width: 260px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--field);
+  color: var(--text);
+  font: inherit;
+  user-select: text;
+}
+#find-input:focus {
+  border-color: var(--accent);
+}
+#find-input.none {
+  border-color: var(--danger);
+}
+#find-count {
+  min-width: 64px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+#chrome {
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---- Popups (address suggestions, downloads, menu) ---------------------- */
+
+#scrim {
+  position: fixed;
+  inset: 0;
+}
+
+.popup {
+  position: fixed;
+  z-index: 10;
+  border-radius: 12px;
+  background: var(--popup);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+#suggestions {
+  padding: 6px;
+}
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--text);
+}
+.suggestion svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+.suggestion.selected {
+  background: var(--popup-hover);
+}
+.suggestion .main {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.suggestion .sub {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.suggestion .sub::before {
+  content: '— ';
+}
+.suggestion .sub:empty {
+  display: none;
+}
+.suggestion .star {
+  color: var(--accent);
+}
+
+#downloads-panel {
+  width: 360px;
+  max-height: 460px;
+  display: flex;
+  flex-direction: column;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 8px;
+}
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+}
+#downloads-list {
+  overflow-y: auto;
+  padding: 0 6px 6px;
+}
+.download {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+}
+.download:hover {
+  background: var(--popup-hover);
+}
+.download .file-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.download .info {
+  flex: 1;
+  min-width: 0;
+}
+.download .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.download.done .name {
+  cursor: pointer;
+}
+.download .status {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.download.failed .status {
+  color: var(--danger);
+}
+.download .bar {
+  height: 3px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.download .bar div {
+  height: 100%;
+  background: var(--accent);
+}
+.empty {
+  padding: 20px;
+  color: var(--muted);
+  text-align: center;
+}
+
+#menu-panel {
+  width: 250px;
+  padding: 6px;
+}
+#menu-panel button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+}
+#menu-panel button:hover {
+  background: var(--popup-hover);
+}
+#menu-panel kbd {
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+}
+#menu-panel hr {
+  margin: 5px 4px;
+  border: 0;
+  border-top: 1px solid var(--line);
 }

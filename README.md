@@ -29,32 +29,56 @@ Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
 
 ## O que já tem
 
-- **Abas** — abrir, fechar (inclusive com o botão do meio), alternar, `⌘1…9`, `Ctrl+Tab`
-- **Escudos** — bloqueio de anúncios e rastreadores com as listas EasyList/EasyPrivacy (motor do Ghostery), contador por página, filtros cosméticos que escondem os espaços vazios dos anúncios e opção de desativar por site
-- **Global Privacy Control** — envia `Sec-GPC: 1` e `DNT: 1` em todas as requisições
-- **Histórico** — `kitty://history`, agrupado por dia, com busca e remoção
-- **Nova aba** — busca DuckDuckGo, total de bloqueios e sites recentes
-- **Vídeos com DRM** — usa o Electron da Castlabs (com Widevine), então Crunchyroll, Netflix, Disney+ etc. conseguem tocar
-- Página de erro própria e tema claro/escuro automático
+**Navegação**
+- Abas: arrastar para reordenar, silenciar, duplicar, fechar outras, reabrir fechada (`⌘⇧T`), botão do meio fecha
+- Barra de endereço com sugestões do histórico, dos favoritos e do buscador
+- Favoritos com barra (`⌘⇧B`) e página de gerenciamento
+- Busca na página (`⌘F`), tela cheia de vídeo, zoom, imprimir, salvar página, ver código-fonte
+- Menu de botão direito completo (links, imagens, texto, corretor ortográfico, inspecionar)
+- Downloads direto em `~/Downloads`, com painel de progresso, pausar e cancelar
+- Restaura as abas ao reabrir; janelas múltiplas; pode ser o navegador padrão do Mac
+- Buscadores: DuckDuckGo, Brave Search, Startpage, Ecosia ou Google
+
+**Privacidade**
+- **Escudos**: bloqueio de anúncios e rastreadores (EasyList/EasyPrivacy) com filtros cosméticos, por site
+- **Janela privativa** (`⇧⌘N`): nada fica salvo, e tudo some ao fechar
+- **HTTPS automático**, com volta para HTTP só quando o site não suporta
+- **Cookies de terceiros bloqueados**
+- **Proteção contra fingerprinting**: ruído por site em canvas, WebGL, áudio e hardware, no estilo do Brave
+- **Permissões de sites**: câmera, microfone, localização e notificações só com o seu OK
+- **Global Privacy Control** (`Sec-GPC` e `navigator.globalPrivacyControl`)
+- Vídeos com DRM via Widevine (Castlabs)
+
+Tudo isso pode ser ajustado em `kitty://settings` (`⌘,`).
 
 ## Atalhos
 
 | Ação | Atalho |
 | --- | --- |
-| Nova aba | `⌘T` |
-| Fechar aba | `⌘W` |
+| Nova aba / janela / janela privativa | `⌘T` / `⌘N` / `⇧⌘N` |
+| Fechar aba / reabrir fechada | `⌘W` / `⇧⌘T` |
 | Barra de endereço | `⌘L` |
-| Histórico | `⌘Y` |
+| Buscar na página | `⌘F` (`⌘G` próxima) |
+| Favoritar / barra de favoritos | `⌘D` / `⇧⌘B` |
+| Histórico / downloads | `⌘Y` / `⇧⌘J` |
+| Configurações | `⌘,` |
 | Voltar / Avançar | `⌘[` / `⌘]` |
-| Recarregar | `⌘R` |
+| Recarregar (sem cache) | `⌘R` (`⇧⌘R`) |
 | Ferramentas do desenvolvedor | `⌥⌘I` |
+
+Para testar sem mexer no seu perfil: `KITTY_PROFILE=/tmp/kitty-teste npm start`.
 
 ## Estrutura
 
 ```
-src/main/   processo principal: abas, bloqueador, histórico, protocolo kitty://
+src/main/   processo principal
+  main.js        inicialização, IPC, favoritos, sugestões, configurações
+  window.js      uma janela: abas, layout, tela cheia, busca, permissões
+  privacy.js     escudos, HTTPS, cookies, permissões, fingerprinting
+  downloads.js   gerenciador de downloads
+  menus.js       menu do app e menus de botão direito
 src/ui/     barra de abas e barra de ferramentas
-src/pages/  páginas internas (nova aba, histórico, erro)
+src/pages/  páginas internas (nova aba, histórico, favoritos, configurações, erro)
 assets/     ícone do app (SVG fonte, PNG e .icns)
 scripts/    geração do ícone
 ```

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
+    <title>Configurações</title>
+    <link rel="stylesheet" href="pages.css" />
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Configurações</h1>
+
+      <section>
+        <h2>Geral</h2>
+        <label class="row">
+          <span><strong>Continuar de onde parou</strong><small>Reabre as abas da última sessão ao iniciar o Kitty</small></span>
+          <input type="checkbox" class="toggle" data-setting="restoreSession" />
+        </label>
+        <label class="row">
+          <span><strong>Mostrar barra de favoritos</strong><small>⇧⌘B</small></span>
+          <input type="checkbox" class="toggle" data-setting="showBookmarksBar" />
+        </label>
+        <div class="row">
+          <span><strong>Navegador padrão</strong><small id="default-status"></small></span>
+          <button id="make-default">Tornar padrão</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Busca</h2>
+        <label class="row">
+          <span><strong>Mecanismo de busca</strong><small>Usado na barra de endereço e na nova aba</small></span>
+          <select id="engine"></select>
+        </label>
+        <label class="row">
+          <span><strong>Sugestões de pesquisa</strong><small>Envia o que você digita ao buscador para sugerir termos. Nunca em janelas privativas.</small></span>
+          <input type="checkbox" class="toggle" data-setting="searchSuggestions" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Privacidade e escudos</h2>
+        <label class="row">
+          <span><strong>Atualizar conexões para HTTPS</strong><small>Abre sites por HTTPS sempre que possível; volta para HTTP só se o site não suportar</small></span>
+          <input type="checkbox" class="toggle" data-setting="httpsUpgrade" />
+        </label>
+        <label class="row">
+          <span><strong>Bloquear cookies de terceiros</strong><small>Impede que sites embutidos (anúncios, botões sociais) rastreiem você entre sites</small></span>
+          <input type="checkbox" class="toggle" data-setting="blockThirdPartyCookies" />
+        </label>
+        <label class="row">
+          <span><strong>Proteção contra fingerprinting</strong><small>Adiciona um ruído imperceptível a canvas, áudio e dados do hardware, diferente em cada site. Vale a partir da próxima página aberta.</small></span>
+          <input type="checkbox" class="toggle" data-setting="antiFingerprinting" />
+        </label>
+        <div class="sub-list">
+          <h3>Sites com escudos desativados</h3>
+          <div id="allowlist"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Permissões de sites</h2>
+        <div id="permissions"></div>
+      </section>
+
+      <section>
+        <h2>Downloads</h2>
+        <div class="row">
+          <span><strong>Pasta</strong><small id="downloads-dir"></small></span>
+          <button id="open-downloads">Abrir pasta</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Limpar dados de navegação</h2>
+        <div class="checks">
+          <label><input type="checkbox" value="history" checked /> Histórico</label>
+          <label><input type="checkbox" value="cookies" checked /> Cookies e dados de sites</label>
+          <label><input type="checkbox" value="cache" checked /> Imagens e arquivos em cache</label>
+          <label><input type="checkbox" value="downloads" /> Lista de downloads</label>
+        </div>
+        <button id="clear" class="danger">Limpar dados</button>
+        <span id="cleared" hidden>Pronto, dados apagados.</span>
+      </section>
+
+      <p class="about">Kitty <span id="version"></span> · feito com Chromium (Electron) e as listas de bloqueio EasyList/EasyPrivacy</p>
+    </main>
+    <script src="settings.js"></script>
+  </body>
+</html>

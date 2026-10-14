@@ -1,0 +1,83 @@
+main { max-width: 720px; margin: 0 auto; padding: 40px 16px 80px; }
+h1 { margin: 0 0 24px; font-size: 26px; }
+section {
+  margin-bottom: 20px;
+  padding: 6px 20px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+h2 {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+h3 { margin: 14px 0 6px; font-size: 13px; font-weight: 600; }
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.row:last-child { border-bottom: 0; }
+.row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.row small { color: var(--muted); font-size: 12.5px; word-break: break-all; }
+select {
+  min-width: 170px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.toggle {
+  appearance: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  flex: none;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.toggle:checked { background: var(--accent); }
+.toggle:checked::after { transform: translateX(16px); }
+.toggle:disabled { opacity: 0.4; cursor: default; }
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+}
+.item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item small { color: var(--muted); }
+.item .allow { color: #4fd18b; }
+.item .deny { color: var(--danger); }
+.item button { padding: 3px 10px; font-size: 12px; }
+.none { color: var(--muted); padding: 6px 0; }
+.checks { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 16px; }
+.checks input { accent-color: var(--accent); }
+.danger { color: var(--danger); }
+#cleared { margin-left: 10px; color: var(--muted); }
+.about { color: var(--muted); font-size: 12px; text-align: center; }

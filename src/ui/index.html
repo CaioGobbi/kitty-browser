@@ -7,43 +7,105 @@
     <link rel="stylesheet" href="ui.css" />
   </head>
   <body>
-    <header id="tabstrip">
-      <div id="tabs" role="tablist"></div>
-      <button id="new-tab" class="icon-btn" title="Nova aba (⌘T)" aria-label="Nova aba">
-        <svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" /></svg>
-      </button>
-      <div class="drag-fill"></div>
-    </header>
+    <div id="chrome">
+      <header id="tabstrip">
+        <div id="tabs" role="tablist"></div>
+        <button id="new-tab" class="icon-btn" title="Nova aba (⌘T)" aria-label="Nova aba">
+          <svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" /></svg>
+        </button>
+        <div class="drag-fill"></div>
+        <div id="private-badge" title="Janela privativa: nada do que você faz aqui fica salvo">
+          <svg viewBox="0 0 24 24"><path d="M3 10c2-1 5.5-1.5 9-1.5s7 .5 9 1.5M5 9.5 7 4h10l2 5.5" /><circle cx="8" cy="15" r="3" /><circle cx="16" cy="15" r="3" /><path d="M11 15h2" /></svg>
+          Privativa
+        </div>
+      </header>
 
-    <nav id="toolbar">
-      <button id="back" class="icon-btn" title="Voltar" aria-label="Voltar">
-        <svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" /></svg>
-      </button>
-      <button id="forward" class="icon-btn" title="Avançar" aria-label="Avançar">
-        <svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" /></svg>
-      </button>
-      <button id="reload" class="icon-btn" title="Recarregar" aria-label="Recarregar">
-        <svg class="i-reload" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3" /></svg>
-        <svg class="i-stop" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" /></svg>
-      </button>
+      <nav id="toolbar">
+        <button id="back" class="icon-btn" title="Voltar (⌘[)" aria-label="Voltar">
+          <svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" /></svg>
+        </button>
+        <button id="forward" class="icon-btn" title="Avançar (⌘])" aria-label="Avançar">
+          <svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" /></svg>
+        </button>
+        <button id="reload" class="icon-btn" title="Recarregar (⌘R)" aria-label="Recarregar">
+          <svg class="i-reload" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3" /></svg>
+          <svg class="i-stop" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+        </button>
 
-      <form id="address-form" autocomplete="off">
-        <span id="site-icon" aria-hidden="true">
-          <svg class="i-lock" viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg>
-          <svg class="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4" /><path d="m10 10 3 3" /></svg>
-          <svg class="i-kitty" viewBox="0 0 24 24"><path d="M4 3l4 4.5h8L20 3v9a8 8 0 0 1-16 0z" /></svg>
-        </span>
-        <input id="address" type="text" spellcheck="false" placeholder="Pesquise com DuckDuckGo ou digite um endereço" />
-      </form>
+        <form id="address-form" autocomplete="off">
+          <span id="site-icon" aria-hidden="true">
+            <svg class="i-lock" viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg>
+            <svg class="i-insecure" viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 0 1 4.6-1.4" /></svg>
+            <svg class="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4" /><path d="m10 10 3 3" /></svg>
+            <svg class="i-kitty" viewBox="0 0 24 24"><path d="M4 3l4 4.5h8L20 3v9a8 8 0 0 1-16 0z" /></svg>
+          </span>
+          <span id="insecure-label">Não seguro</span>
+          <input id="address" type="text" spellcheck="false" />
+          <button id="star" type="button" class="icon-btn small" title="Adicionar aos favoritos (⌘D)" aria-label="Favorito">
+            <svg viewBox="0 0 16 16"><path d="m8 2 1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3l-3.7 2 .8-4.1L2 6.3l4.2-.5z" /></svg>
+          </button>
+        </form>
 
-      <button id="shield" class="shield" title="Escudos do Kitty" aria-label="Escudos do Kitty">
-        <svg viewBox="0 0 24 24"><path d="M12 2.5 4 5.5v6c0 5 3.4 8.9 8 10 4.6-1.1 8-5 8-10v-6z" /><path class="check" d="m8.5 12 2.5 2.5 4.5-5" /></svg>
-        <span id="shield-count"></span>
-      </button>
-      <button id="history" class="icon-btn" title="Histórico (⌘Y)" aria-label="Histórico">
-        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3l2 1.5" /></svg>
-      </button>
-    </nav>
+        <button id="shield" class="shield" title="Escudos do Kitty" aria-label="Escudos do Kitty">
+          <svg viewBox="0 0 24 24"><path d="M12 2.5 4 5.5v6c0 5 3.4 8.9 8 10 4.6-1.1 8-5 8-10v-6z" /><path class="check" d="m8.5 12 2.5 2.5 4.5-5" /></svg>
+          <span id="shield-count"></span>
+        </button>
+        <button id="downloads-btn" class="icon-btn" title="Downloads (⌘⇧J)" aria-label="Downloads" hidden>
+          <svg viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10" /></svg>
+          <svg class="ring" viewBox="0 0 30 30"><circle cx="15" cy="15" r="13" /></svg>
+        </button>
+        <button id="menu-btn" class="icon-btn" title="Menu" aria-label="Menu">
+          <svg viewBox="0 0 16 16"><circle cx="3.5" cy="8" r=".6" /><circle cx="8" cy="8" r=".6" /><circle cx="12.5" cy="8" r=".6" /></svg>
+        </button>
+      </nav>
+
+      <div id="bookmarks-bar" hidden></div>
+
+      <div id="perm-bar" class="infobar" hidden>
+        <svg viewBox="0 0 16 16"><path d="M8 1.8 14.5 13H1.5z" /><path d="M8 6v3.2M8 11.2v.1" /></svg>
+        <span id="perm-text"></span>
+        <div class="spacer"></div>
+        <button id="perm-deny" class="btn">Bloquear</button>
+        <button id="perm-allow" class="btn primary">Permitir</button>
+      </div>
+
+      <div id="find-bar" class="infobar" hidden>
+        <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4" /><path d="m10 10 3 3" /></svg>
+        <input id="find-input" type="text" spellcheck="false" placeholder="Buscar na página" />
+        <span id="find-count"></span>
+        <button id="find-prev" class="icon-btn small" title="Anterior (⇧↵)" aria-label="Anterior">
+          <svg viewBox="0 0 16 16"><path d="m4 10 4-4 4 4" /></svg>
+        </button>
+        <button id="find-next" class="icon-btn small" title="Próxima (↵)" aria-label="Próxima">
+          <svg viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" /></svg>
+        </button>
+        <div class="spacer"></div>
+        <button id="find-close" class="icon-btn small" title="Fechar (Esc)" aria-label="Fechar">
+          <svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="scrim" hidden></div>
+    <div id="suggestions" class="popup" role="listbox" hidden></div>
+    <div id="downloads-panel" class="popup" hidden>
+      <div class="panel-head">
+        <strong>Downloads</strong>
+        <button id="downloads-clear" class="link-btn">Limpar lista</button>
+      </div>
+      <div id="downloads-list"></div>
+    </div>
+    <div id="menu-panel" class="popup" hidden>
+      <button data-action="new-tab">Nova aba<kbd>⌘T</kbd></button>
+      <button data-action="private">Nova janela privativa<kbd>⇧⌘N</kbd></button>
+      <hr />
+      <button data-action="history">Histórico<kbd>⌘Y</kbd></button>
+      <button data-action="bookmarks">Favoritos<kbd>⌥⌘B</kbd></button>
+      <button data-action="downloads">Downloads<kbd>⇧⌘J</kbd></button>
+      <hr />
+      <button data-action="find">Buscar na página<kbd>⌘F</kbd></button>
+      <button data-action="settings">Configurações<kbd>⌘,</kbd></button>
+    </div>
 
     <script src="ui.js"></script>
   </body>

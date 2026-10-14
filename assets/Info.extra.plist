@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Lets macOS offer Kitty as the default web browser and open .html files with it. -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Página web</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.html</string>
+        <string>public.xhtml</string>
+      </array>
+    </dict>
+  </array>
+  <key>NSCameraUsageDescription</key>
+  <string>Sites que você autorizar podem usar a câmera.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Sites que você autorizar podem usar o microfone.</string>
+  <key>NSLocationUsageDescription</key>
+  <string>Sites que você autorizar podem saber sua localização.</string>
+</dict>
+</plist>

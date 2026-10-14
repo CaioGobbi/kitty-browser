@@ -3,10 +3,12 @@
 const q = document.getElementById('q');
 q.focus();
 
+let searchUrl = 'https://duckduckgo.com/?q=';
+
 document.getElementById('search').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = q.value.trim();
-  if (text) location.href = 'https://duckduckgo.com/?q=' + encodeURIComponent(text);
+  if (text) location.href = searchUrl + encodeURIComponent(text);
 });
 
 function formatSaved(blocked) {
@@ -16,6 +18,15 @@ function formatSaved(blocked) {
   if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
   return `${(seconds / 3600).toFixed(1).replace('.', ',')} h`;
 }
+
+window.kitty.context().then((ctx) => {
+  if (!ctx) return;
+  searchUrl = ctx.searchUrl;
+  q.placeholder = `Pesquise com ${ctx.engineName}`;
+  document.body.classList.toggle('private', ctx.isPrivate);
+  document.getElementById('private-note').hidden = !ctx.isPrivate;
+  if (ctx.isPrivate) document.title = 'Janela privativa';
+});
 
 window.kitty.stats().then((stats) => {
   if (!stats) return;
