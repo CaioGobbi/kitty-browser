@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
+    <title>Não foi possível abrir a página</title>
+    <link rel="stylesheet" href="pages.css" />
+    <link rel="stylesheet" href="error.css" />
+  </head>
+  <body>
+    <main>
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3l4 4.5h8L20 3v9a8 8 0 0 1-16 0z" /><path d="M8.5 11.5l2 1.5M15.5 11.5l-2 1.5" stroke="var(--bg)" stroke-width="1.4" stroke-linecap="round" /></svg>
+      <h1>Miau… essa página não abriu</h1>
+      <p id="detail"></p>
+      <code id="reason"></code>
+      <button id="retry">Tentar novamente</button>
+    </main>
+    <script src="error.js"></script>
+  </body>
+</html>

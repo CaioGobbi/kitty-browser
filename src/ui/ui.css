@@ -1,0 +1,349 @@
+:root {
+  --bg: #17151c;
+  --strip: #121016;
+  --tab: transparent;
+  --tab-hover: #201d27;
+  --tab-active: #2a2633;
+  --field: #1f1c26;
+  --field-focus: #2a2633;
+  --text: #ece8f2;
+  --muted: #9a93a8;
+  --line: #2e2a38;
+  --accent: #ff7a45;
+  --accent-soft: rgb(255 122 69 / 0.16);
+  --ok: #4fd18b;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f4f9;
+    --strip: #e9e5ef;
+    --tab-hover: #ddd8e5;
+    --tab-active: #f6f4f9;
+    --field: #e9e5ef;
+    --field-focus: #ffffff;
+    --text: #1d1a24;
+    --muted: #6c6578;
+    --line: #d6d0df;
+    --accent: #e85d27;
+    --accent-soft: rgb(232 93 39 / 0.12);
+    --ok: #18a05a;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 84px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  user-select: none;
+}
+
+svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+  -webkit-app-region: no-drag;
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--tab-hover);
+  color: var(--text);
+}
+.icon-btn:disabled {
+  opacity: 0.35;
+}
+
+/* ---- Tab strip ---------------------------------------------------------- */
+
+#tabstrip {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 40px;
+  padding: 0 8px 0 84px; /* room for the macOS traffic lights */
+  background: var(--strip);
+  -webkit-app-region: drag;
+}
+body.win #tabstrip,
+body.linux #tabstrip {
+  padding-left: 8px;
+  padding-right: 140px;
+}
+
+#tabs {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  height: 34px;
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 220px;
+  min-width: 36px;
+  flex: 0 1 220px;
+  padding: 0 6px 0 12px;
+  border-radius: 10px 10px 0 0;
+  background: var(--tab);
+  color: var(--muted);
+  -webkit-app-region: no-drag;
+}
+.tab:hover {
+  background: var(--tab-hover);
+}
+.tab.active {
+  background: var(--tab-active);
+  color: var(--text);
+}
+.tab.active::before,
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.tab.active::before {
+  left: -10px;
+  background: radial-gradient(circle at 0 0, transparent 10px, var(--tab-active) 10.5px);
+}
+.tab.active::after {
+  right: -10px;
+  background: radial-gradient(circle at 100% 0, transparent 10px, var(--tab-active) 10.5px);
+}
+
+.tab-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.tab-icon img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+.tab-icon .spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.tab-icon .kitty {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  fill: currentColor;
+  stroke: none;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+
+.tab-close {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+}
+.tab-close svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 2;
+}
+.tab:hover .tab-close,
+.tab.active .tab-close {
+  opacity: 1;
+}
+.tab-close:hover {
+  background: var(--line);
+  color: var(--text);
+}
+.tab.narrow .tab-title,
+.tab.narrow:not(.active) .tab-close {
+  display: none;
+}
+
+#new-tab {
+  margin-bottom: 3px;
+}
+
+.drag-fill {
+  flex: 1;
+  align-self: stretch;
+}
+
+/* ---- Toolbar ------------------------------------------------------------ */
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 8px;
+  background: var(--tab-active);
+  border-bottom: 1px solid var(--line);
+}
+
+#reload .i-stop,
+#reload.loading .i-reload {
+  display: none;
+}
+#reload.loading .i-stop {
+  display: block;
+}
+
+#address-form {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin: 0 6px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--field);
+  border: 1px solid transparent;
+}
+#address-form:focus-within {
+  background: var(--field-focus);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+#site-icon {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+#site-icon svg {
+  display: none;
+  width: 14px;
+  height: 14px;
+}
+#site-icon[data-kind='lock'] .i-lock,
+#site-icon[data-kind='search'] .i-search,
+#site-icon[data-kind='kitty'] .i-kitty {
+  display: block;
+}
+#site-icon[data-kind='lock'] {
+  color: var(--ok);
+}
+#site-icon .i-kitty {
+  fill: var(--accent);
+  stroke: none;
+}
+
+#address {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  user-select: text;
+}
+#address::placeholder {
+  color: var(--muted);
+}
+
+.shield {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+}
+.shield svg {
+  width: 20px;
+  height: 20px;
+  fill: var(--accent-soft);
+}
+.shield .check {
+  fill: none;
+}
+.shield:hover:not(:disabled) {
+  background: var(--tab-hover);
+}
+.shield.down {
+  color: var(--muted);
+}
+.shield.down svg {
+  fill: none;
+}
+.shield.down .check {
+  display: none;
+}
+.shield:disabled {
+  opacity: 0.5;
+}
+#shield-count {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+#shield-count:empty {
+  display: none;
+}

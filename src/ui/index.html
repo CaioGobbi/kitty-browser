@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self'" />
+    <title>Kitty</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <header id="tabstrip">
+      <div id="tabs" role="tablist"></div>
+      <button id="new-tab" class="icon-btn" title="Nova aba (⌘T)" aria-label="Nova aba">
+        <svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" /></svg>
+      </button>
+      <div class="drag-fill"></div>
+    </header>
+
+    <nav id="toolbar">
+      <button id="back" class="icon-btn" title="Voltar" aria-label="Voltar">
+        <svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" /></svg>
+      </button>
+      <button id="forward" class="icon-btn" title="Avançar" aria-label="Avançar">
+        <svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" /></svg>
+      </button>
+      <button id="reload" class="icon-btn" title="Recarregar" aria-label="Recarregar">
+        <svg class="i-reload" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3" /></svg>
+        <svg class="i-stop" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+      </button>
+
+      <form id="address-form" autocomplete="off">
+        <span id="site-icon" aria-hidden="true">
+          <svg class="i-lock" viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></svg>
+          <svg class="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4" /><path d="m10 10 3 3" /></svg>
+          <svg class="i-kitty" viewBox="0 0 24 24"><path d="M4 3l4 4.5h8L20 3v9a8 8 0 0 1-16 0z" /></svg>
+        </span>
+        <input id="address" type="text" spellcheck="false" placeholder="Pesquise com DuckDuckGo ou digite um endereço" />
+      </form>
+
+      <button id="shield" class="shield" title="Escudos do Kitty" aria-label="Escudos do Kitty">
+        <svg viewBox="0 0 24 24"><path d="M12 2.5 4 5.5v6c0 5 3.4 8.9 8 10 4.6-1.1 8-5 8-10v-6z" /><path class="check" d="m8.5 12 2.5 2.5 4.5-5" /></svg>
+        <span id="shield-count"></span>
+      </button>
+      <button id="history" class="icon-btn" title="Histórico (⌘Y)" aria-label="Histórico">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3l2 1.5" /></svg>
+      </button>
+    </nav>
+
+    <script src="ui.js"></script>
+  </body>
+</html>

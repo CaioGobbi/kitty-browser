@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:" />
+    <title>Histórico</title>
+    <link rel="stylesheet" href="pages.css" />
+    <link rel="stylesheet" href="history.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Histórico</h1>
+        <button id="clear" class="danger">Limpar histórico</button>
+      </header>
+      <input id="filter" type="search" placeholder="Pesquisar no histórico" spellcheck="false" />
+      <div id="list"></div>
+      <p id="empty" hidden>Nada por aqui ainda.</p>
+    </main>
+    <script src="history.js"></script>
+  </body>
+</html>
