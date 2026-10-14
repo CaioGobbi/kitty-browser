@@ -15,7 +15,17 @@ npm start
 npm run install-app
 ```
 
-Gera o `Kitty.app` (Apple Silicon), assina localmente e copia para `/Applications`. Para só gerar o app em `out/`, use `npm run dist`. Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
+Gera o `Kitty.app` (Apple Silicon), assina localmente e copia para `/Applications`. Para só gerar o app em `out/`, use `npm run dist`. ### Crunchyroll, Netflix e outros com DRM
+
+Esses serviços só liberam a licença do vídeo para apps com assinatura **VMP** da Castlabs (grátis). Uma vez só:
+
+```bash
+npm run evs-signup
+```
+
+Depois disso, `npm run install-app` já assina automaticamente.
+
+Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
 
 ## O que já tem
 

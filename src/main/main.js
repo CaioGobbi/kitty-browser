@@ -14,7 +14,7 @@ const {
   protocol,
   session,
 } = require('electron');
-const { ElectronBlocker, fromElectronDetails } = require('@ghostery/adblocker-electron');
+const { ElectronBlocker, Request, fromElectronDetails } = require('@ghostery/adblocker-electron');
 
 const { Store } = require('./store');
 
@@ -271,6 +271,54 @@ function focusAddressBar() {
 // ---------------------------------------------------------------------------
 // Privacy: ad/tracker blocking + Global Privacy Control
 
+/**
+ * Applies cosmetic filters to the frame that asked for them. Ghostery's own
+ * handler runs scriptlets in the *main* frame for every iframe's request, so
+ * pages with several iframes (Crunchyroll) got the same scriptlet stacked
+ * until it overflowed the call stack and broke the page.
+ */
+function injectCosmetics(event, url, msg) {
+  const frame = event.senderFrame;
+  if (!frame) return;
+  const { hostname, domain } = Request.fromRawDetails({ url });
+  const isFirstRun = msg === undefined; // later calls carry DOM info (classes, ids, hrefs)
+  const { active, styles, scripts } = blocker.getCosmeticsFilters({
+    url,
+    hostname,
+    domain: domain || '',
+    classes: msg?.classes,
+    hrefs: msg?.hrefs,
+    ids: msg?.ids,
+    getBaseRules: isFirstRun,
+    getInjectionRules: isFirstRun,
+    getExtendedRules: false,
+    getRulesFromHostname: isFirstRun,
+    getRulesFromDOM: !isFirstRun,
+    callerContext: { frameId: event.frameId, processId: event.processId, lifecycle: msg?.lifecycle },
+  });
+  if (active === false) return;
+
+  if (styles.length > 0) {
+    if (frame === event.sender.mainFrame) {
+      event.sender.insertCSS(styles, { cssOrigin: 'user' });
+    } else {
+      const css = JSON.stringify(styles);
+      frame
+        .executeJavaScript(
+          `(() => { const s = document.createElement('style'); s.textContent = ${css}; (document.head || document.documentElement).append(s); })()`,
+        )
+        .catch(() => {});
+    }
+  }
+  // Each scriptlet declares helpers (safeSelf, proxyApplyFn…) at top level. Run
+  // side by side in the page's global scope, a later scriptlet overwrites an
+  // earlier one's helpers and its Function.prototype.toString proxy recurses
+  // forever. Wrapping each one keeps its helpers private.
+  for (const script of scripts) {
+    frame.executeJavaScript(`(() => {\n${script}\n})();`, true).catch(() => {});
+  }
+}
+
 async function setupBlocker(ses) {
   ses.webRequest.onBeforeRequest((details, callback) => {
     if (!blocker || details.resourceType === 'mainFrame' || !details.webContentsId) {
@@ -304,7 +352,7 @@ async function setupBlocker(ses) {
   ipcMain.handle('@ghostery/adblocker/inject-cosmetic-filters', (event, url, msg) => {
     const tab = tabs.get(event.sender.id);
     if (!blocker || !tab || !isShieldUp(tab.view.webContents.getURL())) return;
-    return blocker.onInjectCosmeticFilters(event, url, msg);
+    injectCosmetics(event, url, msg);
   });
   ipcMain.handle('@ghostery/adblocker/is-mutation-observer-enabled', (event) =>
     blocker ? blocker.onIsMutationObserverEnabled(event) : false,
