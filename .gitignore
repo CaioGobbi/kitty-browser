@@ -4,3 +4,4 @@ out/
 .venv/
 native/*/build/
 src/main/native/
+*.log
