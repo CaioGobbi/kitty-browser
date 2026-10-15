@@ -148,17 +148,16 @@ function bypassThreat(url) {
 // Cosmetic filtering
 
 /**
- * Applies cosmetic filters to the frame that asked for them. Ghostery's own
- * handler runs scriptlets in the *main* frame for every iframe's request, so
- * pages with several iframes (Crunchyroll) got the same scriptlet stacked
- * until it overflowed the call stack and broke the page.
+ * Applies cosmetic CSS to the frame that asked for it (Ghostery's own handler
+ * always targets the main frame). Scriptlets are injected separately, earlier:
+ * see scriptletsFor().
  */
 function injectCosmetics(event, url, msg) {
   const frame = event.senderFrame;
   if (!frame) return;
   const { hostname, domain } = Request.fromRawDetails({ url });
   const isFirstRun = msg === undefined; // later calls carry DOM info (classes, ids, hrefs)
-  const { active, styles, scripts } = lists.adBlocker().getCosmeticsFilters({
+  const { active, styles } = lists.adBlocker().getCosmeticsFilters({
     url,
     hostname,
     domain: domain || '',
@@ -166,7 +165,7 @@ function injectCosmetics(event, url, msg) {
     hrefs: msg?.hrefs,
     ids: msg?.ids,
     getBaseRules: isFirstRun,
-    getInjectionRules: isFirstRun,
+    getInjectionRules: false, // scriptlets run earlier, from preload-scriptlets.js
     getExtendedRules: false,
     getRulesFromHostname: isFirstRun,
     getRulesFromDOM: !isFirstRun,
@@ -186,13 +185,52 @@ function injectCosmetics(event, url, msg) {
         .catch(() => {});
     }
   }
+}
+
+/**
+ * Scriptlets that break sites in Kitty. The lists are written for uBlock
+ * Origin, and a few rules clash here with other rules editing the same data.
+ */
+const SCRIPTLET_EXCEPTIONS = [
+  // YouTube: rewriting "adPlacements"/"adSlots" to "no_ads" in /player fetch
+  // responses, on top of the json-prune rules that already strip them, leaves
+  // the player retrying forever — the video's length flickers between 0:00
+  // and the real value and playback never starts.
+  { host: /(^|\.)youtube\.com$/, source: /trustedReplaceFetchResponse[\s\S]*`player%3F`/ },
+  // YouTube: the same rewrite on /player XHR responses adds ~3 s before every
+  // video starts, and json-prune-xhr-response already removes those fields.
+  { host: /(^|\.)youtube\.com$/, source: /trustedReplaceXhrResponse[\s\S]*player/ },
+];
+
+/**
+ * Scriptlets for a frame, asked synchronously by preload-scriptlets.js so they
+ * run before the page's own scripts.
+ */
+function scriptletsFor(webContentsId, frameUrl) {
+  const blocker = lists.adBlocker();
+  if (!blocker || !/^https?:/.test(String(frameUrl))) return [];
+  const found = registry.tabByWebContentsId(webContentsId);
+  const top = found ? found.tab.view.webContents.getURL() || frameUrl : frameUrl;
+  if (!isShieldUp(top)) return [];
+  const { hostname, domain } = Request.fromRawDetails({ url: frameUrl });
+  const { active, scripts } = blocker.getCosmeticsFilters({
+    url: frameUrl,
+    hostname,
+    domain: domain || '',
+    getBaseRules: false,
+    getInjectionRules: true,
+    getExtendedRules: false,
+    getRulesFromHostname: true,
+    getRulesFromDOM: false,
+  });
+  if (active === false) return [];
+  const exceptions = SCRIPTLET_EXCEPTIONS.filter((e) => e.host.test(hostname));
+  const allowed = scripts.filter((script) => !exceptions.some((e) => e.source.test(script)));
   // Each scriptlet declares helpers (safeSelf, proxyApplyFn…) at top level. Run
   // side by side in the page's global scope, a later scriptlet overwrites an
   // earlier one's helpers and its Function.prototype.toString proxy recurses
   // forever. Wrapping each one keeps its helpers private.
-  for (const script of scripts) {
-    frame.executeJavaScript(`(() => {\n${script}\n})();`, true).catch(() => {});
-  }
+  return allowed.map((script) => `(() => {\n${script}\n})();`);
 }
 
 // ---------------------------------------------------------------------------
@@ -363,6 +401,7 @@ function setupSession(ses) {
   // protection run as preloads in every frame.
   ses.registerPreloadScript({ type: 'frame', filePath: require.resolve('@ghostery/adblocker-electron-preload') });
   ses.registerPreloadScript({ type: 'frame', filePath: path.join(__dirname, 'preload-fingerprint.js') });
+  ses.registerPreloadScript({ type: 'frame', filePath: path.join(__dirname, 'preload-scriptlets.js') });
 }
 
 function shieldsUpFor(details) {
@@ -379,6 +418,14 @@ function registerPrivacyIpc() {
   ipcMain.handle('@ghostery/adblocker/is-mutation-observer-enabled', (event) =>
     lists.adBlocker() ? lists.adBlocker().onIsMutationObserverEnabled(event) : false,
   );
+
+  ipcMain.on('kitty:scriptlets', (event, frameUrl) => {
+    try {
+      event.returnValue = scriptletsFor(event.sender.id, frameUrl);
+    } catch {
+      event.returnValue = [];
+    }
+  });
 
   // Asked synchronously by preload-fingerprint.js before any page script runs.
   ipcMain.on('kitty:fingerprint', (event, frameUrl) => {
