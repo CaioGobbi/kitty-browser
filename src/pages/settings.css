@@ -26,7 +26,7 @@ h3 { margin: 14px 0 6px; font-size: 13px; font-weight: 600; }
 }
 .row:last-child { border-bottom: 0; }
 .row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.row small { color: var(--muted); font-size: 12.5px; word-break: break-all; }
+.row small { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 select {
   min-width: 170px;
   height: 32px;
