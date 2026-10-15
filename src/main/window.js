@@ -68,7 +68,6 @@ class KittyWindow {
     this.chromeHeight = DEFAULT_CHROME_HEIGHT;
     this.overlay = false;
     this.htmlFullscreen = false;
-    this.fullscreenByPage = false;
     this.findText = '';
     this.stateTimer = null;
 
@@ -327,13 +326,13 @@ class KittyWindow {
     wc.on('found-in-page', (_e, result) => {
       if (tab.id === this.activeId) this.sendUi('find:result', { active: result.activeMatchOrdinal, matches: result.matches });
     });
+    // Electron itself puts the window in and out of fullscreen for the page.
+    // Kitty only hides its own interface: toggling the window here too made
+    // Electron think the user had chosen fullscreen, so on the way out it never
+    // told the page it had left — the video stayed stuck in fullscreen mode.
     wc.on('enter-html-full-screen', () => {
       if (tab.id !== this.activeId) return;
       this.htmlFullscreen = true;
-      if (!this.win.isFullScreen()) {
-        this.fullscreenByPage = true;
-        this.win.setFullScreen(true);
-      }
       this.layout();
     });
     wc.on('leave-html-full-screen', () => this.exitHtmlFullscreen());
@@ -342,8 +341,6 @@ class KittyWindow {
   exitHtmlFullscreen() {
     if (!this.htmlFullscreen) return;
     this.htmlFullscreen = false;
-    if (this.fullscreenByPage && this.win.isFullScreen()) this.win.setFullScreen(false);
-    this.fullscreenByPage = false;
     this.layout();
   }
 
