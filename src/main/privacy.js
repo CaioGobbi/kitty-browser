@@ -206,6 +206,24 @@ function fingerprintExceptionsFor(topUrl) {
 const YOUTUBE = /(^|\.)youtube\.com$/;
 
 /**
+ * While the ad skipper fast-forwards an ad, nothing of it is shown: the video,
+ * its overlays and the player controls go invisible (still clickable, so the
+ * real "Skip" click lands) and the player stays black until the video starts.
+ */
+const YOUTUBE_AD_CSS = `
+#movie_player.ad-showing { background: #000 !important; }
+#movie_player.ad-showing video,
+#movie_player.ad-showing .video-ads,
+#movie_player.ad-showing .ytp-ad-module,
+#movie_player.ad-showing .ytp-ad-player-overlay,
+#movie_player.ad-showing .ytp-ad-player-overlay-layout,
+#movie_player.ad-showing .ytp-paid-content-overlay,
+#movie_player.ad-showing .ytp-chrome-top,
+#movie_player.ad-showing .ytp-chrome-bottom,
+#movie_player.ad-showing .ytp-gradient-bottom { opacity: 0 !important; }
+`;
+
+/**
  * YouTube's own "ad was shown" reports (www.youtube.com/pagead/…,
  * /api/stats/ads, /ptracking). The player waits for them after an ad; blocked,
  * it sat for 10–20 s before starting the video. They go to YouTube itself, which
@@ -435,10 +453,19 @@ function registerPrivacyIpc() {
   );
 
   ipcMain.on('kitty:scriptlets', (event, frameUrl) => {
+    let result = { scripts: [], adSkipper: false };
     try {
-      event.returnValue = scriptletsFor(event.sender.id, frameUrl);
+      result = scriptletsFor(event.sender.id, frameUrl);
     } catch {
-      event.returnValue = { scripts: [], adSkipper: false };
+      // keep the empty answer: the page loads without scriptlets
+    }
+    // (event.returnValue can only be written: reading it back gives undefined)
+    event.returnValue = result;
+    // A user-origin stylesheet: the page can't override or remove it. Added
+    // once the document exists (this runs as it starts loading).
+    if (result.adSkipper && event.senderFrame === event.sender.mainFrame) {
+      const wc = event.sender;
+      wc.once('dom-ready', () => wc.insertCSS(YOUTUBE_AD_CSS, { cssOrigin: 'user' }).catch(() => {}));
     }
   });
 
