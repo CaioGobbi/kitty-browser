@@ -188,31 +188,47 @@ function injectCosmetics(event, url, msg) {
 }
 
 /**
- * Scriptlets that break sites in Kitty. The lists are written for uBlock
- * Origin, and a few rules clash here with other rules editing the same data.
+ * Fingerprinting protections a site can't live with, by site. Feature names
+ * match the on('…') blocks in preload-fingerprint.js.
  */
-const SCRIPTLET_EXCEPTIONS = [
-  // YouTube: rewriting "adPlacements"/"adSlots" to "no_ads" in /player fetch
-  // responses, on top of the json-prune rules that already strip them, leaves
-  // the player retrying forever — the video's length flickers between 0:00
-  // and the real value and playback never starts.
-  { host: /(^|\.)youtube\.com$/, source: /trustedReplaceFetchResponse[\s\S]*`player%3F`/ },
-  // YouTube: the same rewrite on /player XHR responses adds ~3 s before every
-  // video starts, and json-prune-xhr-response already removes those fields.
-  { host: /(^|\.)youtube\.com$/, source: /trustedReplaceXhrResponse[\s\S]*player/ },
-];
+const FINGERPRINT_EXCEPTIONS = [];
+
+function fingerprintExceptionsFor(topUrl) {
+  let hostname = '';
+  try {
+    hostname = new URL(topUrl).hostname;
+  } catch {
+    return [];
+  }
+  return FINGERPRINT_EXCEPTIONS.filter((e) => e.host.test(hostname)).flatMap((e) => e.features);
+}
+
+const YOUTUBE = /(^|\.)youtube\.com$/;
+
+/**
+ * YouTube's own "ad was shown" reports (www.youtube.com/pagead/…,
+ * /api/stats/ads, /ptracking). The player waits for them after an ad; blocked,
+ * it sat for 10–20 s before starting the video. They go to YouTube itself, which
+ * already knows what you watch there; third-party ad trackers stay blocked.
+ */
+function isYoutubeAdReport(url) {
+  return /^https:\/\/www\.youtube\.com\/(pagead\/|api\/stats\/ads|ptracking)/.test(url);
+}
 
 /**
  * Scriptlets for a frame, asked synchronously by preload-scriptlets.js so they
- * run before the page's own scripts.
+ * run before the page's own scripts. On YouTube the lists' scriptlets are
+ * replaced by Kitty's ad skipper (see preload-scriptlets.js).
  */
 function scriptletsFor(webContentsId, frameUrl) {
+  const none = { scripts: [], adSkipper: false };
   const blocker = lists.adBlocker();
-  if (!blocker || !/^https?:/.test(String(frameUrl))) return [];
+  if (!blocker || !/^https?:/.test(String(frameUrl))) return none;
   const found = registry.tabByWebContentsId(webContentsId);
   const top = found ? found.tab.view.webContents.getURL() || frameUrl : frameUrl;
-  if (!isShieldUp(top)) return [];
+  if (!isShieldUp(top)) return none;
   const { hostname, domain } = Request.fromRawDetails({ url: frameUrl });
+  if (YOUTUBE.test(hostname)) return { scripts: [], adSkipper: true };
   const { active, scripts } = blocker.getCosmeticsFilters({
     url: frameUrl,
     hostname,
@@ -223,14 +239,12 @@ function scriptletsFor(webContentsId, frameUrl) {
     getRulesFromHostname: true,
     getRulesFromDOM: false,
   });
-  if (active === false) return [];
-  const exceptions = SCRIPTLET_EXCEPTIONS.filter((e) => e.host.test(hostname));
-  const allowed = scripts.filter((script) => !exceptions.some((e) => e.source.test(script)));
+  if (active === false) return none;
   // Each scriptlet declares helpers (safeSelf, proxyApplyFn…) at top level. Run
   // side by side in the page's global scope, a later scriptlet overwrites an
   // earlier one's helpers and its Function.prototype.toString proxy recurses
   // forever. Wrapping each one keeps its helpers private.
-  return allowed.map((script) => `(() => {\n${script}\n})();`);
+  return { scripts: scripts.map((script) => `(() => {\n${script}\n})();`), adSkipper: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -359,6 +373,7 @@ function setupSession(ses) {
     }
     const blocker = lists.adBlocker();
     if (!blocker || details.resourceType === 'mainFrame' || !details.webContentsId) return callback({});
+    if (isYoutubeAdReport(details.url)) return callback({});
 
     const found = registry.tabByWebContentsId(details.webContentsId);
     if (!found || !isShieldUp(found.tab.view.webContents.getURL())) return callback({});
@@ -423,7 +438,25 @@ function registerPrivacyIpc() {
     try {
       event.returnValue = scriptletsFor(event.sender.id, frameUrl);
     } catch {
-      event.returnValue = [];
+      event.returnValue = { scripts: [], adSkipper: false };
+    }
+  });
+
+  // The YouTube ad skipper asks for a real click on the "Skip" button: page
+  // scripts can't make one. Only for the main frame of a YouTube tab.
+  ipcMain.on('kitty:click', (event, point) => {
+    const found = registry.tabByWebContentsId(event.sender.id);
+    if (!found || event.senderFrame !== event.sender.mainFrame) return;
+    let host = '';
+    try {
+      host = new URL(event.sender.getURL()).hostname;
+    } catch {}
+    if (!YOUTUBE.test(host)) return;
+    const x = Number(point?.x);
+    const y = Number(point?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    for (const type of ['mouseDown', 'mouseUp']) {
+      event.sender.sendInputEvent({ type, x, y, button: 'left', clickCount: 1 });
     }
   });
 
@@ -435,7 +468,7 @@ function registerPrivacyIpc() {
       data.settings.get('antiFingerprinting') && /^https?:/.test(String(frameUrl)) && isShieldUp(top);
     const key = fingerprintKeys.get(event.sender.session) || Buffer.alloc(16);
     const seed = crypto.createHmac('sha256', key).update(siteOf(top) || 'none').digest().readUInt32LE(0);
-    event.returnValue = { enabled, seed };
+    event.returnValue = { enabled, seed, skip: fingerprintExceptionsFor(top) };
   });
 }
 

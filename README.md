@@ -64,7 +64,7 @@ Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
 - Buscadores: DuckDuckGo, Brave Search, Startpage, Ecosia ou Google
 
 **Privacidade**
-- **Escudos**: bloqueio de anúncios e rastreadores (EasyList/EasyPrivacy) com filtros cosméticos, por site
+- **Escudos**: bloqueio de anúncios e rastreadores (EasyList/EasyPrivacy) com filtros cosméticos, por site. No YouTube, os anúncios são silenciados, acelerados e pulados na hora, sem mexer nos dados do player
 - **Janela privativa** (`⇧⌘N`): nada fica salvo, e tudo some ao fechar
 - **HTTPS automático**, com volta para HTTP só quando o site não suporta
 - **Cookies de terceiros bloqueados**, inclusive os criados por scripts dentro de iframes
