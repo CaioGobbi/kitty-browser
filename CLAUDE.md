@@ -78,6 +78,7 @@ Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório 
 - [ ] Extensões do Chrome (o Electron só suporta parte).
 - [ ] Importar do Safari (favoritos em `Bookmarks.plist`, histórico em `History.db`; exige Acesso Total ao Disco).
 - [ ] Suporte a Linux, como próximo passo futuro. Não há máquina Linux para testar, então qualquer trabalho aqui precisa de outra forma de validação.
-- [ ] Mac: atualização automática e distribuição exigem Developer ID da Apple (pago).
+- [ ] Mac: atualização automática e distribuição exigem Developer ID da Apple (pago). Alternativa em aberto (esperando o OK do Jailson): publicar um `.zip` sem assinatura nas versões, com aviso no README para liberar em Privacidade e Segurança.
+- [ ] Lançamento open source: o repositório já é público, com README voltado para quem chega (prints em `docs/screenshots/`, tirados com perfil limpo via `KITTY_PROFILE`). Falta divulgar.
 - [ ] Windows: assinatura de código para tirar o aviso do SmartScreen (certificado pago).
 - [ ] Lacunas de privacidade conhecidas: fingerprinting em workers carregados de URL e fontes no DOM; phishing só por listas abertas.
