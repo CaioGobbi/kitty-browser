@@ -150,7 +150,9 @@ function displayUrl(tab) {
 
 function renderTabs() {
   const existing = new Map([...tabsEl.children].map((node) => [Number(node.dataset.id), node]));
-  const narrow = state.tabs.length * 110 > tabsEl.parentElement.clientWidth - 220;
+  const pinnedWidth = state.tabs.filter((t) => t.pinned).length * 46;
+  const narrow = state.tabs.filter((t) => !t.pinned).length * 110 > tabsEl.parentElement.clientWidth - 220 - pinnedWidth;
+  const lastPinned = state.tabs.filter((t) => t.pinned).at(-1)?.id;
 
   state.tabs.forEach((tab, i) => {
     let node = existing.get(tab.id);
@@ -160,6 +162,8 @@ function renderTabs() {
 
     node.classList.toggle('active', tab.id === state.activeTabId);
     node.classList.toggle('narrow', narrow);
+    node.classList.toggle('pinned', !!tab.pinned);
+    node.classList.toggle('last-pinned', tab.id === lastPinned);
     node.setAttribute('aria-selected', String(tab.id === state.activeTabId));
     node.title = tab.title;
     node.querySelector('.tab-title').textContent = tab.title;

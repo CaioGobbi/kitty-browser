@@ -386,6 +386,14 @@ function registerIpc() {
   ui('downloads:action', (_w, { id, what } = {}) => downloads.action(id, what));
   ui('downloads:clear', () => downloads.clearFinished());
 
+  // Two-finger swipe and mouse buttons, reported by preload-page.js.
+  ipcMain.on('gesture:navigate', (event, direction) => {
+    const found = registry.tabByWebContentsId(event.sender.id);
+    if (!found || found.tab.id !== found.kwin.activeId) return;
+    if (direction === 'back') found.kwin.goBack();
+    if (direction === 'forward') found.kwin.goForward();
+  });
+
   ipcMain.handle('ui:suggest', async (event, query) => {
     const kwin = registry.byUi(event.sender);
     const text = String(query || '').trim().slice(0, 200);

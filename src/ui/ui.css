@@ -285,6 +285,37 @@ body.linux #tabstrip {
   background: var(--line);
   color: var(--text);
 }
+/* Pinned tabs: just the icon, always on the left */
+.tab.pinned {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  justify-content: center;
+  padding: 0;
+}
+.tab.pinned .tab-title,
+.tab.pinned .tab-close {
+  display: none;
+}
+.tab.pinned .tab-audio {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  width: 16px;
+  height: 16px;
+  background: var(--strip);
+}
+.tab.pinned.active .tab-audio {
+  background: var(--tab-active);
+}
+.tab.pinned .tab-audio svg {
+  width: 11px;
+  height: 11px;
+}
+.tab.last-pinned {
+  margin-right: 6px;
+}
+
 .tab.narrow .tab-title,
 .tab.narrow .tab-audio,
 .tab.narrow:not(.active) .tab-close {

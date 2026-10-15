@@ -105,6 +105,7 @@ function buildAppMenu() {
         { label: 'Próxima aba', accelerator: 'Alt+CmdOrCtrl+Right', visible: false, click: withWin((w) => w.cycleTab(1)) },
         { label: 'Aba anterior', accelerator: 'Alt+CmdOrCtrl+Left', visible: false, click: withWin((w) => w.cycleTab(-1)) },
         { label: 'Silenciar aba', accelerator: 'Ctrl+M', click: withWin((w) => w.toggleMute()) },
+        { label: 'Fixar/desafixar aba', click: withWin((w) => w.togglePin()) },
         { type: 'separator' },
         ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
           label: n === 9 ? 'Última aba' : `Aba ${n}`,
@@ -330,11 +331,12 @@ function tabContextMenu(kwin, id) {
   const index = kwin.order.indexOf(id);
   const muted = tab.view.webContents.isAudioMuted();
   Menu.buildFromTemplate([
-    { label: 'Nova aba à direita', click: () => kwin.createTab(undefined, { index: index + 1 }) },
+    { label: 'Nova aba à direita', click: () => kwin.createTab(undefined, { index: tab.pinned ? kwin.order.length : index + 1 }) },
     { type: 'separator' },
     { label: 'Recarregar', click: () => tab.view.webContents.reload() },
     { label: 'Duplicar', click: () => kwin.duplicateTab(id) },
     { label: muted ? 'Ativar som da aba' : 'Silenciar aba', click: () => kwin.toggleMute(id) },
+    { label: tab.pinned ? 'Desafixar aba' : 'Fixar aba', click: () => kwin.togglePin(id) },
     { type: 'separator' },
     { label: 'Fechar aba', click: () => kwin.closeTab(id) },
     { label: 'Fechar outras abas', enabled: kwin.order.length > 1, click: () => kwin.closeOtherTabs(id) },

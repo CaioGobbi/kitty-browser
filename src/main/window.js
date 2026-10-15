@@ -105,6 +105,16 @@ class KittyWindow {
     });
 
     this.win.on('resize', () => this.layout());
+    // Three-finger swipe (macOS, when set to "swipe between pages") and the
+    // mouse back/forward buttons on Windows.
+    this.win.on('swipe', (_e, direction) => {
+      if (direction === 'right') this.goBack();
+      if (direction === 'left') this.goForward();
+    });
+    this.win.on('app-command', (_e, command) => {
+      if (command === 'browser-backward') this.goBack();
+      if (command === 'browser-forward') this.goForward();
+    });
     this.win.on('focus', () => registry.focus(this));
     this.win.on('enter-full-screen', () => this.sendUi('ui:fullscreen', true));
     this.win.on('leave-full-screen', () => {
@@ -152,6 +162,7 @@ class KittyWindow {
       audible: !tab.pendingUrl && wc.isCurrentlyAudible(),
       muted: wc.isAudioMuted(),
       bookmarked: isBookmarked(url),
+      pinned: tab.pinned,
       prompt: prompt ? { id: prompt.id, origin: prompt.origin, label: prompt.label } : null,
     };
   }
@@ -206,7 +217,7 @@ class KittyWindow {
     return {
       tabs: this.order.map((id) => {
         const s = this.tabState(this.tabs.get(id));
-        return { url: s.url, title: s.title, favicon: s.favicon };
+        return { url: s.url, title: s.title, favicon: s.favicon, pinned: s.pinned };
       }),
       active: Math.max(0, this.order.indexOf(this.activeId)),
     };
@@ -215,7 +226,7 @@ class KittyWindow {
   // -------------------------------------------------------------------------
   // Tabs
 
-  createTab(url = NEW_TAB_URL, { activate = true, index = null, lazy = false, title = '', favicon = null } = {}) {
+  createTab(url = NEW_TAB_URL, { activate = true, index = null, lazy = false, title = '', favicon = null, pinned = false } = {}) {
     const view = new WebContentsView({
       webPreferences: {
         session: this.session,
@@ -238,11 +249,11 @@ class KittyWindow {
       prompts: [],
       pendingUrl: lazy ? url : null,
       pendingTitle: title,
+      pinned,
     };
-    this.tabs.set(tab.id, tab);
-
     const at = index ?? (this.activeId != null ? this.order.indexOf(this.activeId) + 1 : this.order.length);
-    this.order.splice(Math.max(0, Math.min(at, this.order.length)), 0, tab.id);
+    this.order.splice(this.clampToGroup(at, pinned), 0, tab.id);
+    this.tabs.set(tab.id, tab);
 
     this.wireTab(tab);
     if (!lazy) wc.loadURL(url).catch(() => {}); // failures are handled by did-fail-load
@@ -342,6 +353,7 @@ class KittyWindow {
         lazy: i !== activeIndex,
         title: t.title,
         favicon: t.favicon,
+        pinned: !!t.pinned,
       });
     });
     this.switchTab(this.order[activeIndex]);
@@ -406,7 +418,8 @@ class KittyWindow {
 
   closeOtherTabs(id, { onlyRight = false } = {}) {
     const index = this.order.indexOf(id);
-    const victims = this.order.filter((other, i) => other !== id && (!onlyRight || i > index));
+    // Like Chrome, pinned tabs survive "close other tabs".
+    const victims = this.order.filter((other, i) => other !== id && !this.tabs.get(other).pinned && (!onlyRight || i > index));
     if (this.activeId !== id && victims.includes(this.activeId)) this.switchTab(id);
     for (const other of victims) this.closeTab(other);
   }
@@ -425,7 +438,24 @@ class KittyWindow {
     const from = this.order.indexOf(id);
     if (from === -1) return;
     this.order.splice(from, 1);
-    this.order.splice(Math.max(0, Math.min(toIndex, this.order.length)), 0, id);
+    this.order.splice(this.clampToGroup(toIndex, this.tabs.get(id).pinned), 0, id);
+    this.sendState();
+  }
+
+  /** Pinned tabs live at the start of the strip; an index never crosses that boundary. */
+  clampToGroup(index, pinned) {
+    const pinnedCount = this.order.filter((id) => this.tabs.get(id)?.pinned).length;
+    return pinned ? Math.max(0, Math.min(index, pinnedCount)) : Math.max(pinnedCount, Math.min(index, this.order.length));
+  }
+
+  togglePin(id = this.activeId) {
+    const tab = this.tabs.get(id);
+    if (!tab) return;
+    this.order.splice(this.order.indexOf(id), 1);
+    tab.pinned = !tab.pinned;
+    // Pinning appends to the pinned group; unpinning puts the tab first among the others.
+    const pinnedCount = this.order.filter((other) => this.tabs.get(other).pinned).length;
+    this.order.splice(pinnedCount, 0, id);
     this.sendState();
   }
 
@@ -450,6 +480,16 @@ class KittyWindow {
     if (!wc) return;
     wc.loadURL(resolveInput(input)).catch(() => {});
     wc.focus();
+  }
+
+  goBack() {
+    const nav = this.activeWebContents()?.navigationHistory;
+    if (nav?.canGoBack()) nav.goBack();
+  }
+
+  goForward() {
+    const nav = this.activeWebContents()?.navigationHistory;
+    if (nav?.canGoForward()) nav.goForward();
   }
 
   /** Reloads the page; on the error page, retries the address that failed. */

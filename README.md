@@ -53,7 +53,8 @@ Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
 ## O que já tem
 
 **Navegação**
-- Abas: arrastar para reordenar, silenciar, duplicar, fechar outras, reabrir fechada (`⌘⇧T`), botão do meio fecha
+- Abas: fixar, arrastar para reordenar, silenciar, duplicar, fechar outras, reabrir fechada (`⌘⇧T`), botão do meio fecha
+- Gestos: deslize dois dedos no trackpad para voltar/avançar (ou três, se o Mac estiver configurado assim) e botões laterais do mouse
 - Barra de endereço com sugestões do histórico, dos favoritos e do buscador
 - Favoritos com barra (`⌘⇧B`) e página de gerenciamento
 - Busca na página (`⌘F`), tela cheia de vídeo, zoom, imprimir, salvar página, ver código-fonte
