@@ -40,13 +40,13 @@ No Windows os atalhos usam `Ctrl` no lugar de `⌘`, e valem também os de costu
 
 ### Crunchyroll, Netflix e outros com DRM
 
-Esses serviços só liberam a licença do vídeo para apps com assinatura **VMP** da Castlabs (grátis). Uma vez só:
+Esses serviços só liberam a licença do vídeo (Widevine) para apps com assinatura **VMP**, que a Castlabs emite de graça pelo serviço EVS. As versões publicadas do Kitty já vêm assinadas. Para assinar os seus próprios builds, crie uma conta EVS uma vez:
 
 ```bash
 npm run evs-signup
 ```
 
-Depois disso, `npm run install-app` já assina automaticamente.
+Depois disso, `npm run dist` (Mac) e `npm run dist:win` (Windows) assinam sozinhos. No Mac a assinatura VMP é feita antes da assinatura da Apple; no Windows, depois.
 
 Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
 
@@ -76,7 +76,7 @@ Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
 - Listas de bloqueio **atualizadas sozinhas** (anúncios a cada 24 h, ameaças a cada 6 h)
 - **Permissões de sites**: câmera, microfone, localização e notificações só com o seu OK
 - **Global Privacy Control** (`Sec-GPC` e `navigator.globalPrivacyControl`)
-- Vídeos com DRM via Widevine (Castlabs)
+- Vídeos com DRM via Widevine (Castlabs), com assinatura VMP: Crunchyroll e outros serviços de streaming funcionam
 
 Tudo isso pode ser ajustado em `kitty://settings` (`⌘,`).
 
