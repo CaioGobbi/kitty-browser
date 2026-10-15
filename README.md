@@ -15,7 +15,22 @@ npm start
 npm run install-app
 ```
 
-Gera o `Kitty.app` (Apple Silicon), assina localmente e copia para `/Applications`. Para só gerar o app em `out/`, use `npm run dist`. ### Crunchyroll, Netflix e outros com DRM
+Gera o `Kitty.app` (Apple Silicon), assina localmente e copia para `/Applications`. Para só gerar o app em `out/`, use `npm run dist`. ## Instalador para Windows
+
+```bash
+npm run dist:win
+```
+
+Gera `out/windows/Kitty-Setup-<versão>.exe` (Windows 10/11, 64 bits), dá para gerar direto do Mac. O instalador:
+- instala só para o usuário atual (sem pedir administrador), com atalhos na área de trabalho e no menu Iniciar;
+- registra o Kitty como navegador, para ele aparecer em Configurações → Apps → Aplicativos padrão;
+- remove tudo isso ao desinstalar (seus dados ficam em `%APPDATA%\Kitty`).
+
+O instalador não é assinado digitalmente, então o Windows SmartScreen avisa na primeira vez: clique em **Mais informações → Executar assim mesmo**.
+
+No Windows os atalhos usam `Ctrl` no lugar de `⌘`, e valem também os de costume: `F5`, `Ctrl+F5`, `Alt+←`/`Alt+→`, `Ctrl+H`, `Ctrl+J`, `F11`, `F12`, `Ctrl+Tab`/`Ctrl+PageDown`.
+
+### Crunchyroll, Netflix e outros com DRM
 
 Esses serviços só liberam a licença do vídeo para apps com assinatura **VMP** da Castlabs (grátis). Uma vez só:
 
@@ -43,7 +58,7 @@ Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
 - **Escudos**: bloqueio de anúncios e rastreadores (EasyList/EasyPrivacy) com filtros cosméticos, por site
 - **Janela privativa** (`⇧⌘N`): nada fica salvo, e tudo some ao fechar
 - **HTTPS automático**, com volta para HTTP só quando o site não suporta
-- **Cookies de terceiros bloqueados**
+- **Cookies de terceiros bloqueados**, inclusive os criados por scripts dentro de iframes
 - **Proteção contra sites perigosos**: avisa antes de abrir phishing e malware (listas malware-filter, URLhaus e uBlock Origin), verificando tudo localmente
 - **Links sem rastreadores**: remove `utm_*`, `fbclid`, `gclid` e similares antes de abrir
 - **DNS seguro** (DNS over HTTPS) com Quad9, Cloudflare ou Mullvad

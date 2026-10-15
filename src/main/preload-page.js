@@ -7,6 +7,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 if (location.protocol === 'kitty:') {
   const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
   contextBridge.exposeInMainWorld('kitty', {
+    platform: process.platform,
     context: invoke('kitty:context'),
     stats: invoke('kitty:stats'),
     history: invoke('kitty:history'),

@@ -23,12 +23,21 @@ app.whenReady().then(async () => {
   });
   win.webContents.setZoomFactor(1);
   const svg = fs.readFileSync(path.join(ASSETS, 'icon.svg'), 'utf8');
-  const html = `<html><body style="margin:0;background:transparent">${svg}</body></html>`;
-  await win.loadURL(`data:text/html;base64,${Buffer.from(html).toString('base64')}`);
-  await new Promise((r) => setTimeout(r, 300));
+  const render = async (markup) => {
+    const html = `<html><body style="margin:0;background:transparent">${markup}</body></html>`;
+    await win.loadURL(`data:text/html;base64,${Buffer.from(html).toString('base64')}`);
+    await new Promise((r) => setTimeout(r, 300));
+    return (await win.webContents.capturePage()).resize({ width: SIZE, height: SIZE, quality: 'best' });
+  };
 
-  const image = (await win.webContents.capturePage()).resize({ width: SIZE, height: SIZE, quality: 'best' });
+  const image = await render(svg);
   fs.writeFileSync(path.join(ASSETS, 'icon.png'), image.toPNG());
+
+  // Windows icons fill their square: crop the macOS margin and shadow away.
+  const windows = await render(
+    svg.replace('viewBox="0 0 1024 1024"', 'viewBox="100 100 824 824"').replace(' filter="url(#shadow)"', ''),
+  );
+  fs.writeFileSync(path.join(ASSETS, 'icon-win.png'), windows.toPNG());
 
   if (process.platform === 'darwin') {
     const iconset = path.join(ASSETS, 'icon.iconset');

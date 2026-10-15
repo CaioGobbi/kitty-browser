@@ -124,7 +124,87 @@ function buildAppMenu() {
       ],
     },
   ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    return;
+  }
+  // Windows/Linux: the title bar is hidden, so a menu bar would never show (and
+  // its accelerators aren't reliable without it). Shortcuts are matched from
+  // each webContents instead; Chromium already handles editing keys (Ctrl+C…).
+  Menu.setApplicationMenu(null);
+  shortcuts = [];
+  collectShortcuts(template);
+  for (const [accelerator, click] of windowsShortcuts()) shortcuts.push({ ...parseAccelerator(accelerator), click });
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts on Windows/Linux
+
+let shortcuts = [];
+
+/** The usual Windows browser keys, on top of the menu's own shortcuts. */
+function windowsShortcuts() {
+  const nav = (fn) => withWin((w) => fn(w.activeWebContents()?.navigationHistory));
+  return [
+    ['F5', withWin((w) => w.reload())],
+    ['Ctrl+F5', withWin((w) => w.reload({ hard: true }))],
+    ['Shift+F5', withWin((w) => w.reload({ hard: true }))],
+    ['Alt+Left', nav((h) => h?.goBack())],
+    ['Alt+Right', nav((h) => h?.goForward())],
+    ['Alt+Home', withWin((w) => w.navigate('kitty://newtab'))],
+    ['Ctrl+H', () => actions.openInternal('kitty://history')],
+    ['Ctrl+J', withWin((w) => w.sendUi('downloads:toggle'))],
+    ['Ctrl+Shift+O', () => actions.openInternal('kitty://bookmarks')],
+    ['Ctrl+PageDown', withWin((w) => w.cycleTab(1))],
+    ['Ctrl+PageUp', withWin((w) => w.cycleTab(-1))],
+    ['Ctrl+F4', withWin((w) => w.closeTab())],
+    ['Ctrl+Shift+I', withWin((w) => w.activeWebContents()?.toggleDevTools())],
+    ['F12', withWin((w) => w.activeWebContents()?.toggleDevTools())],
+    ['F11', withWin((w) => w.win.setFullScreen(!w.win.isFullScreen()))],
+    ['F6', withWin((w) => w.focusAddressBar())],
+    ['Alt+D', withWin((w) => w.focusAddressBar())],
+    ['Ctrl+E', withWin((w) => w.focusAddressBar())],
+    ['Ctrl+K', withWin((w) => w.focusAddressBar())],
+    ['F3', withWin((w) => w.sendUi('find:step', 1))],
+    ['Shift+F3', withWin((w) => w.sendUi('find:step', -1))],
+  ];
+}
+
+const KEY_NAMES = { Plus: '+', Left: 'ArrowLeft', Right: 'ArrowRight', Up: 'ArrowUp', Down: 'ArrowDown', Esc: 'Escape' };
+
+function parseAccelerator(accelerator) {
+  const parts = accelerator.split('+');
+  const key = parts.pop();
+  const mods = new Set(parts.map((p) => p.toLowerCase()));
+  return {
+    key: (KEY_NAMES[key] || key).toLowerCase(),
+    ctrl: mods.has('cmdorctrl') || mods.has('ctrl') || mods.has('control') || mods.has('cmd') || mods.has('command'),
+    shift: mods.has('shift'),
+    alt: mods.has('alt') || mods.has('option'),
+  };
+}
+
+function collectShortcuts(items) {
+  for (const item of items) {
+    if (item.submenu) collectShortcuts(item.submenu);
+    else if (item.accelerator && item.click && !item.role) {
+      // macOS-only spellings (Alt+Cmd+I) have Windows equivalents above.
+      if (/\bCmd\b|Command/.test(item.accelerator)) continue;
+      shortcuts.push({ ...parseAccelerator(item.accelerator), click: item.click });
+    }
+  }
+}
+
+/** Runs the shortcut matching a key press; returns true when one did. */
+function handleShortcut(input) {
+  if (input.type !== 'keyDown' || input.meta) return false;
+  const key = String(input.key).toLowerCase();
+  const match = shortcuts.find(
+    (s) => s.key === key && s.ctrl === input.control && s.alt === input.alt && (s.key === '+' || s.shift === input.shift),
+  );
+  if (!match) return false;
+  match.click();
+  return true;
 }
 
 function zoom(kwin, delta) {
@@ -283,4 +363,4 @@ function bookmarkContextMenu(kwin, id) {
   ]).popup({ window: kwin.win });
 }
 
-module.exports = { actions, buildAppMenu, pageContextMenu, tabContextMenu, bookmarkContextMenu };
+module.exports = { actions, buildAppMenu, handleShortcut, pageContextMenu, tabContextMenu, bookmarkContextMenu };

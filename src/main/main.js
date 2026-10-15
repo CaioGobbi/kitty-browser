@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { app, components, ipcMain, net, protocol, session, shell } = require('electron');
 
@@ -16,6 +17,21 @@ const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 app.setName('Kitty');
 // A throwaway profile for development and tests: KITTY_PROFILE=/tmp/x npm start
 if (process.env.KITTY_PROFILE) app.setPath('userData', path.resolve(process.env.KITTY_PROFILE));
+if (process.platform === 'win32') app.setAppUserModelId('app.kitty.browser');
+
+// One Kitty per profile: on Windows every link opened from another app starts
+// a new process, which hands its URL to the running Kitty and exits.
+const isPrimaryInstance = app.requestSingleInstanceLock();
+if (!isPrimaryInstance) app.quit();
+
+// Settings are read before startup: some only apply as Chromium switches.
+initData(app.getPath('userData'));
+if (data.settings.get('blockThirdPartyCookies')) {
+  // Chromium's own third-party cookie blocking (the one Chrome is testing).
+  // Unlike header filtering, it also stops cookies that scripts inside
+  // third-party iframes write through document.cookie.
+  app.commandLine.appendSwitch('test-third-party-cookie-phaseout');
+}
 
 const PAGES_DIR = path.join(__dirname, '..', 'pages');
 
@@ -111,6 +127,19 @@ function openInternal(url) {
   } else {
     kwin.createTab(url);
   }
+}
+
+/** URLs and .html files Windows passes on the command line (Kitty as default browser). */
+function urlsFromArgv(argv) {
+  return argv
+    .slice(1)
+    .filter((arg) => !arg.startsWith('-'))
+    .map((arg) => {
+      if (/^https?:\/\//i.test(arg)) return arg;
+      if (/\.x?html?$/i.test(arg) && fs.existsSync(arg)) return pathToFileURL(path.resolve(arg)).toString();
+      return null;
+    })
+    .filter(Boolean);
 }
 
 /** Links from other apps (Kitty as default browser) and .html files from Finder. */
@@ -241,6 +270,15 @@ async function remoteSuggestions(query) {
 // Settings
 
 function isDefaultBrowser() {
+  if (process.platform === 'win32') {
+    // Windows keeps the user's choice per protocol; the installer registers Kitty as "KittyURL".
+    try {
+      const out = execFileSync('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice', '/v', 'ProgId'], { encoding: 'utf8', windowsHide: true });
+      return out.includes('KittyURL');
+    } catch {
+      return false;
+    }
+  }
   return app.isDefaultProtocolClient('https') && app.isDefaultProtocolClient('http');
 }
 
@@ -255,6 +293,7 @@ function settingsSnapshot() {
     permissions: privacy.permissionList(),
     isDefaultBrowser: isDefaultBrowser(),
     canBeDefault: app.isPackaged,
+    platform: process.platform,
     downloadsDir: app.getPath('downloads'),
     version: app.getVersion(),
   };
@@ -328,6 +367,7 @@ function registerIpc() {
     if (['history', 'bookmarks', 'settings'].includes(page)) openInternal(`kitty://${page}`);
   });
   ui('window:private', () => newPrivateWindow());
+  ui('window:new', () => newWindow());
   ui('find:query', (w, { text, forward, next } = {}) => w.find(text, { forward: forward !== false, next: !!next }));
   ui('find:stop', (w) => w.stopFind());
   ui('perm:answer', (w, { tabId, promptId, allow } = {}) => w.answerPrompt(tabId, promptId, allow));
@@ -437,7 +477,11 @@ function registerIpc() {
   });
   ipcMain.handle('kitty:settings-default-browser', (event) => {
     if (!fromPage(event, 'settings')) return null;
-    if (app.isPackaged) {
+    if (!app.isPackaged) return settingsSnapshot();
+    if (process.platform === 'win32') {
+      // Windows 10/11 only let the user pick the default browser, in Settings.
+      shell.openExternal('ms-settings:defaultapps?registeredAppUser=Kitty');
+    } else {
       app.setAsDefaultProtocolClient('http');
       app.setAsDefaultProtocolClient('https');
     }
@@ -460,14 +504,26 @@ app.on('open-file', (event, filePath) => {
   openExternalUrl(pathToFileURL(filePath).toString());
 });
 
+app.on('second-instance', (_event, argv) => {
+  const urls = urlsFromArgv(argv);
+  if (urls.length) return urls.forEach(openExternalUrl);
+  const kwin = registry.current({ allowPrivate: false });
+  if (kwin) {
+    if (kwin.win.isMinimized()) kwin.win.restore();
+    kwin.win.focus();
+  } else if (ready) {
+    new KittyWindow();
+  }
+});
+
 app.whenReady().then(async () => {
+  if (!isPrimaryInstance) return;
   // Castlabs Electron ships Widevine as a component; DRM video only plays
   // once it is installed and ready.
   if (components) {
     await components.whenReady().catch((err) => console.error('[kitty] Widevine indisponível:', err));
   }
 
-  initData(app.getPath('userData'));
   downloads.loadLog();
   app.userAgentFallback = cleanUserAgent(app.userAgentFallback);
   applyDns();
@@ -479,6 +535,7 @@ app.whenReady().then(async () => {
   hooks.setupProfile = setupProfile;
   hooks.onChange = persistSession;
   hooks.contextMenu = menus.pageContextMenu;
+  hooks.shortcut = menus.handleShortcut;
   Object.assign(menus.actions, {
     newWindow,
     newPrivateWindow,
@@ -502,6 +559,7 @@ app.whenReady().then(async () => {
   else new KittyWindow();
 
   ready = true;
+  if (process.platform !== 'darwin') pendingUrls.push(...urlsFromArgv(process.argv));
   for (const url of pendingUrls.splice(0)) openExternalUrl(url);
 
   app.on('activate', () => {

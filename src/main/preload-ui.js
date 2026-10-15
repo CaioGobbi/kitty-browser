@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
   toggleShield: send('shield:toggle'),
   openInternal: send('open:internal'),
   newPrivateWindow: send('window:private'),
+  newWindow: send('window:new'),
   find: send('find:query'),
   stopFind: send('find:stop'),
   answerPermission: send('perm:answer'),

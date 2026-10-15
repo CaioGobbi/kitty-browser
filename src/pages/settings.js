@@ -24,6 +24,12 @@ const PERMISSION_NAMES = {
   openExternal: 'Abrir aplicativos externos',
 };
 
+if (window.kitty.platform !== 'darwin') {
+  for (const small of document.querySelectorAll('small')) {
+    small.textContent = small.textContent.replace('⇧⌘B', 'Ctrl+Shift+B');
+  }
+}
+
 function item(label, detail, onRemove) {
   const row = document.createElement('div');
   row.className = 'item';
@@ -90,6 +96,7 @@ function render(s) {
       ? 'O Kitty é o seu navegador padrão 🎉'
       : 'Links de outros apps abrem em outro navegador';
   $('make-default').hidden = s.isDefaultBrowser || !s.canBeDefault;
+  $('make-default').textContent = s.platform === 'win32' ? 'Escolher nas Configurações do Windows' : 'Tornar padrão';
 
   $('allowlist').replaceChildren(
     ...(s.allowlist.length

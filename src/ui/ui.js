@@ -29,6 +29,24 @@ if (api.isPrivate) {
   document.body.classList.add('private');
 }
 
+const isMac = api.platform === 'darwin';
+
+/** "⇧⌘N" → "Ctrl+Shift+N" outside macOS (tooltips and menu hints are written the Mac way). */
+function pcShortcuts(text) {
+  return text.replace(/([⌃⌥⇧⌘]+)([^\s)]+)/g, (_m, mods, key) => {
+    const names = [];
+    if (mods.includes('⌘') || mods.includes('⌃')) names.push('Ctrl');
+    if (mods.includes('⇧')) names.push('Shift');
+    if (mods.includes('⌥')) names.push('Alt');
+    return [...names, key === '↵' ? 'Enter' : key].join('+');
+  });
+}
+if (!isMac) {
+  for (const node of document.querySelectorAll('[title]')) node.title = pcShortcuts(node.title);
+  for (const kbd of document.querySelectorAll('kbd')) kbd.textContent = pcShortcuts(kbd.textContent);
+}
+const keys = (text) => (isMac ? text : pcShortcuts(text));
+
 let state = { activeTabId: null, tabs: [] };
 let bookmarks = [];
 let downloads = [];
@@ -238,7 +256,7 @@ function renderToolbar() {
   $('back').disabled = !tab?.canGoBack;
   $('forward').disabled = !tab?.canGoForward;
   reloadBtn.classList.toggle('loading', !!tab?.loading);
-  reloadBtn.title = tab?.loading ? 'Parar' : 'Recarregar (⌘R)';
+  reloadBtn.title = tab?.loading ? 'Parar' : keys('Recarregar (⌘R)');
 
   if (!editing) address.value = displayUrl(tab);
   address.placeholder = `Pesquise com ${uiSettings.engineName} ou digite um endereço`;
@@ -249,7 +267,7 @@ function renderToolbar() {
   const web = tab && /^https?:/.test(tab.url);
   starBtn.hidden = !web;
   starBtn.classList.toggle('on', !!tab?.bookmarked);
-  starBtn.title = tab?.bookmarked ? 'Remover dos favoritos (⌘D)' : 'Adicionar aos favoritos (⌘D)';
+  starBtn.title = keys(tab?.bookmarked ? 'Remover dos favoritos (⌘D)' : 'Adicionar aos favoritos (⌘D)');
 
   const shieldable = tab && !tab.internal;
   shieldBtn.disabled = !shieldable;
@@ -547,7 +565,7 @@ function renderDownloads() {
         else action(ICONS.pause, 'Pausar', 'pause');
         action(ICONS.close, 'Cancelar', 'cancel');
       } else {
-        if (done) action(ICONS.folder, 'Mostrar no Finder', 'show');
+        if (done) action(ICONS.folder, isMac ? 'Mostrar no Finder' : 'Mostrar na pasta', 'show');
         action(ICONS.close, 'Remover da lista', 'remove');
       }
       row.append(el('div', 'file-icon', ext), info, ...actions);
@@ -589,6 +607,7 @@ menuPanel.addEventListener('click', (e) => {
   closePopup();
   if (action === 'new-tab') api.newTab();
   if (action === 'private') api.newPrivateWindow();
+  if (action === 'new-window') api.newWindow();
   if (action === 'history' || action === 'bookmarks' || action === 'settings') api.openInternal(action);
   if (action === 'downloads') toggleDownloads();
   if (action === 'find') openFind();

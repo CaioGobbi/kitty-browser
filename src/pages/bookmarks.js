@@ -89,5 +89,7 @@ async function render() {
   }
 }
 
+if (window.kitty.platform !== 'darwin') empty.textContent = empty.textContent.replace('⌘D', 'Ctrl+D');
+
 filter.addEventListener('input', render);
 render();

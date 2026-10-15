@@ -3,7 +3,7 @@
 // One Kitty browser window: the browser UI (tab strip, toolbar, bars) as a
 // WebContentsView on top, and one WebContentsView per tab below it.
 const path = require('node:path');
-const { BaseWindow, WebContentsView, session } = require('electron');
+const { BaseWindow, WebContentsView, nativeTheme, session } = require('electron');
 
 const { data, searchUrl, isInternal, isShieldUp, isBookmarked } = require('./data');
 const { registry } = require('./registry');
@@ -17,8 +17,24 @@ const CLOSED_TABS_LIMIT = 25;
 
 let privateCounter = 0;
 
-/** Set by main.js: { setupProfile(ses, opts), onChange(), contextMenu(kwin, tab, params) } */
-const hooks = { setupProfile() {}, onChange() {}, contextMenu() {} };
+/** Set by main.js: { setupProfile(ses, opts), onChange(), contextMenu(kwin, tab, params), shortcut(input) } */
+const hooks = { setupProfile() {}, onChange() {}, contextMenu() {}, shortcut: () => false };
+
+/** Windows/Linux draw the minimize/maximize/close buttons over the tab strip: match its colors. */
+function titleBarOverlay(isPrivate) {
+  if (isPrivate) return { height: 40, color: '#160f22', symbolColor: '#ece8f2' };
+  return nativeTheme.shouldUseDarkColors
+    ? { height: 40, color: '#121016', symbolColor: '#ece8f2' }
+    : { height: 40, color: '#e9e5ef', symbolColor: '#1d1a24' };
+}
+
+/** On Windows/Linux, keyboard shortcuts are matched per webContents (see menus.js). */
+function listenForShortcuts(webContents) {
+  if (process.platform === 'darwin') return;
+  webContents.on('before-input-event', (event, input) => {
+    if (hooks.shortcut(input)) event.preventDefault();
+  });
+}
 
 /** Turns whatever the user typed in the address bar into a URL. */
 function resolveInput(input) {
@@ -65,8 +81,12 @@ class KittyWindow {
       backgroundColor: isPrivate ? '#1a1326' : '#17151c',
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
       trafficLightPosition: { x: 14, y: 13 },
-      titleBarOverlay: process.platform === 'darwin' ? false : { height: 40, color: '#00000000' },
+      titleBarOverlay: process.platform === 'darwin' ? false : titleBarOverlay(isPrivate),
     });
+    if (process.platform !== 'darwin') {
+      this.onThemeChange = () => this.win.setTitleBarOverlay(titleBarOverlay(isPrivate));
+      nativeTheme.on('updated', this.onThemeChange);
+    }
 
     this.ui = new WebContentsView({
       webPreferences: {
@@ -76,6 +96,7 @@ class KittyWindow {
       },
     });
     this.ui.setBackgroundColor('#00000000');
+    listenForShortcuts(this.ui.webContents);
     this.win.contentView.addChildView(this.ui);
     this.ui.webContents.loadFile(path.join(UI_DIR, 'index.html'), { query: { private: isPrivate ? '1' : '0' } });
     this.ui.webContents.once('did-finish-load', () => {
@@ -208,6 +229,7 @@ class KittyWindow {
     // WebRTC only uses the default route's public address: local network
     // addresses (and the real IP behind a split VPN) aren't exposed to sites.
     wc.setWebRTCIPHandlingPolicy('default_public_interface_only');
+    listenForShortcuts(wc);
     const tab = {
       id: wc.id,
       view,
@@ -537,6 +559,7 @@ class KittyWindow {
   // -------------------------------------------------------------------------
 
   destroy() {
+    if (this.onThemeChange) nativeTheme.off('updated', this.onThemeChange);
     for (const tab of this.tabs.values()) {
       this.denyPrompts(tab);
       if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
