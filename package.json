@@ -17,6 +17,7 @@
     "evs-signup": ".venv/bin/python -m castlabs_evs.account signup",
     "dist:win": "electron-builder --win nsis --x64",
     "release:win": "sh scripts/release-win.sh",
+    "release:mac": "sh scripts/release-mac.sh",
     "build:native": "sh scripts/build-native.sh",
     "predist": "npm run build:native",
     "prestart": "[ -f src/main/native/swipe_phase.node ] || npm run build:native"

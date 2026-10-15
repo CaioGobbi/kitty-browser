@@ -8,7 +8,7 @@ O Kitty é um navegador focado em privacidade, no estilo do Brave, feito em Elec
 
 | Plataforma | Situação |
 | --- | --- |
-| macOS (Apple Silicon) | Gerado e instalado localmente em `/Applications/Kitty.app`. Sem distribuição pública nem atualização automática (falta Developer ID da Apple) |
+| macOS (Apple Silicon) | Gerado e instalado localmente em `/Applications/Kitty.app`. DMG sem assinatura da Apple em cada release (desde a 0.2.4); sem atualização automática (falta Developer ID da Apple) |
 | Windows 10/11 x64 | Instalador NSIS publicado no GitHub Releases, com atualização automática |
 | Linux | Não suportado ainda; ver "O que falta" |
 
@@ -26,7 +26,7 @@ O Kitty é um navegador focado em privacidade, no estilo do Brave, feito em Elec
 - `src/ui/` — barra de abas, endereço e painéis (a vista de cima de cada janela).
 - `src/pages/` — páginas internas `kitty://newtab`, `history`, `bookmarks`, `settings`, `blocked`, `error`.
 - `native/swipe-phase/` — módulo nativo (Objective-C, N-API) que lê as fases do trackpad no Mac; compilado para `src/main/native/` (fora do git).
-- `scripts/` — build do ícone, do módulo nativo, assinatura VMP no Mac e no Windows, release do Windows.
+- `scripts/` — build do ícone, do módulo nativo, assinatura VMP no Mac e no Windows, release do Windows e do Mac.
 - `assets/` — ícones, `Info.extra.plist` do Mac, `installer.nsh` (registro do navegador no Windows).
 
 Dados do usuário no Mac: `~/Library/Application Support/Kitty` (`settings.json`, `history.json`, `bookmarks.json`, `session.json`, `downloads.json`, listas `*-engine*.bin`).
@@ -47,6 +47,7 @@ Dados do usuário no Mac: `~/Library/Application Support/Kitty` (`settings.json`
 | `npm run install-app` | `dist` e copia para `/Applications` |
 | `npm run dist:win` | Gera `out/windows/Kitty-Setup-<versão>.exe` |
 | `npm run release:win` | Build do Windows, push e release no GitHub (ver abaixo) |
+| `npm run release:mac` | DMG do Mac anexado ao release da versão atual (rodar depois do `release:win`) |
 | `npm run icon` | Regera os ícones a partir de `assets/icon.svg` |
 
 Para testar sem mexer no perfil real: `KITTY_PROFILE=<pasta> npx electron . --inspect=9229 --remote-debugging-port=9333` (processo principal na 9229, páginas via CDP na 9333). Mais truques de diagnóstico no resumo.
@@ -56,8 +57,9 @@ Para testar sem mexer no perfil real: `KITTY_PROFILE=<pasta> npx electron . --in
 1. Só com OK explícito do dono do projeto: cada release chega a todos os Kitty instalados no Windows.
 2. Subir `version` no `package.json` e commitar ("Versão X.Y.Z: …").
 3. `npm run release:win` (precisa de `gh auth login`). O script gera o instalador, dá push, cria o release `vX.Y.Z` e envia `.exe`, `.blockmap` e por último `latest.yml`, para ninguém ver a versão antes do instalador estar lá.
-4. No Mac, `npm run install-app` atualiza o app local (não há distribuição pública).
-5. Atualizar este arquivo (versão atual e histórico) e o resumo.
+4. `npm run release:mac`: gera o `Kitty.app`, empacota em `out/Kitty-X.Y.Z-mac-arm64.dmg` e anexa ao mesmo release. Recusa rodar com alterações sem commit, porque o DMG sai da pasta atual.
+5. No Mac, `npm run install-app` atualiza o app local.
+6. Atualizar este arquivo (versão atual e histórico) e o resumo.
 
 Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório (senão a Castlabs recusa a assinatura VMP); no Mac a VMP vem antes da assinatura da Apple, no Windows depois; sem conta Castlabs EVS configurada os scripts só avisam e o app sai sem VMP.
 
@@ -78,7 +80,7 @@ Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório 
 - [ ] Extensões do Chrome (o Electron só suporta parte).
 - [ ] Importar do Safari (favoritos em `Bookmarks.plist`, histórico em `History.db`; exige Acesso Total ao Disco).
 - [ ] Suporte a Linux, como próximo passo futuro. Não há máquina Linux para testar, então qualquer trabalho aqui precisa de outra forma de validação.
-- [ ] Mac: atualização automática e distribuição exigem Developer ID da Apple (pago). Alternativa em aberto (esperando o OK do Jailson): publicar um `.zip` sem assinatura nas versões, com aviso no README para liberar em Privacidade e Segurança.
+- [ ] Mac: assinatura da Apple e atualização automática exigem Developer ID (pago). Enquanto isso, cada versão leva um DMG sem assinatura da Apple (`npm run release:mac`, depois do `release:win`, com o código sem alterações pendentes); o README ensina a liberar em Privacidade e Segurança. Primeiro DMG publicado: 0.2.4.
 - [ ] Lançamento open source: o repositório já é público, com README voltado para quem chega (prints em `docs/screenshots/`, tirados com perfil limpo via `KITTY_PROFILE`). Falta divulgar.
 - [ ] Windows: assinatura de código para tirar o aviso do SmartScreen (certificado pago).
 - [ ] Lacunas de privacidade conhecidas: fingerprinting em workers carregados de URL e fontes no DOM; phishing só por listas abertas.

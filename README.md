@@ -17,7 +17,9 @@ O instalador:
 - registra o Kitty como navegador, para ele aparecer em Configurações → Apps → Aplicativos padrão;
 - remove tudo isso ao desinstalar (seus dados ficam em `%APPDATA%\Kitty`).
 
-**macOS (Apple Silicon):** ainda não há download pronto. Por enquanto, gere o app a partir do código, como explicado em [Compilar no Mac](#compilar-no-mac).
+**macOS (Apple Silicon, M1 ou mais novo):** baixe o `Kitty-*-mac-arm64.dmg` da [versão mais recente](https://github.com/CaioGobbi/kitty-browser/releases/latest), abra e arraste o Kitty para a pasta Aplicativos.
+
+> O Kitty ainda não tem assinatura da Apple, então o macOS bloqueia na primeira vez que você abre. Para liberar: abra o Kitty uma vez e feche o aviso, vá em **Ajustes do Sistema → Privacidade e Segurança**, role até o fim e clique em **Abrir Mesmo Assim**. Depois disso ele abre normalmente. No Mac o Kitty ainda não se atualiza sozinho: para atualizar, baixe o DMG da versão nova.
 
 Linux ainda não é suportado.
 
@@ -116,7 +118,7 @@ Depois disso, `npm run dist` (Mac) e `npm run dist:win` (Windows) assinam sozinh
 
 ### Publicar uma versão (mantenedores)
 
-Suba a versão no `package.json`, faça o commit e rode `npm run release:win` (precisa do `gh auth login`). O script gera o instalador e cria a versão no GitHub Releases, de onde os Kitty instalados no Windows se atualizam sozinhos.
+Suba a versão no `package.json`, faça o commit e rode `npm run release:win` (precisa do `gh auth login`). O script gera o instalador e cria a versão no GitHub Releases, de onde os Kitty instalados no Windows se atualizam sozinhos. Depois rode `npm run release:mac`, que gera o DMG para Mac e anexa na mesma versão (o código precisa estar sem alterações pendentes).
 
 ## Estrutura
 
