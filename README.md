@@ -146,6 +146,10 @@ Dados do usuário ficam em `~/Library/Application Support/Kitty` no Mac e em `%A
 
 Achou um bug ou quer sugerir algo? Abra uma [issue](https://github.com/CaioGobbi/kitty-browser/issues). Pull requests são bem-vindos.
 
+## Apoiar
+
+O Kitty é gratuito e não tem anúncios nem coleta de dados. Se ele te ajuda, você pode apoiar o projeto pelo [GitHub Sponsors](https://github.com/sponsors/CaioGobbi).
+
 ## Licença
 
 [MPL-2.0](LICENSE), a mesma do Firefox.

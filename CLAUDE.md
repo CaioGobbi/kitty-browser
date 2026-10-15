@@ -81,6 +81,6 @@ Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório 
 - [ ] Importar do Safari (favoritos em `Bookmarks.plist`, histórico em `History.db`; exige Acesso Total ao Disco).
 - [ ] Suporte a Linux, como próximo passo futuro. Não há máquina Linux para testar, então qualquer trabalho aqui precisa de outra forma de validação.
 - [ ] Mac: assinatura da Apple e atualização automática exigem Developer ID (pago). Enquanto isso, cada versão leva um DMG sem assinatura da Apple (`npm run release:mac`, depois do `release:win`, com o código sem alterações pendentes); o README ensina a liberar em Privacidade e Segurança. Primeiro DMG publicado: 0.2.4.
-- [ ] Lançamento open source: o repositório já é público, com README voltado para quem chega (prints em `docs/screenshots/`, tirados com perfil limpo via `KITTY_PROFILE`). Falta divulgar.
+- [ ] Lançamento open source: o repositório já é público, com README voltado para quem chega (prints em `docs/screenshots/`, tirados com perfil limpo via `KITTY_PROFILE`). Falta divulgar. Doações pelo GitHub Sponsors (`github.com/sponsors/CaioGobbi`), com botão "Sponsor" no repositório via `.github/FUNDING.yml` e seção "Apoiar" no README.
 - [ ] Windows: assinatura de código para tirar o aviso do SmartScreen (certificado pago).
 - [ ] Lacunas de privacidade conhecidas: fingerprinting em workers carregados de URL e fontes no DOM; phishing só por listas abertas.
