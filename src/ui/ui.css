@@ -171,6 +171,15 @@ body.linux #tabstrip {
   display: flex;
   align-items: center;
   gap: 7px;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    flex-basis 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    min-width 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    padding 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    margin 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    gap 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   width: 220px;
   min-width: 36px;
   flex: 0 1 220px;
@@ -189,8 +198,11 @@ body.linux #tabstrip {
 }
 .tab.dragging {
   z-index: 2;
-  transition: none;
   opacity: 0.92;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+}
+.tab.closing {
+  pointer-events: none;
 }
 .tab.active::before,
 .tab.active::after {
@@ -246,9 +258,13 @@ body.linux #tabstrip {
 .tab-title {
   flex: 1;
   min-width: 0;
+  max-width: 220px;
   overflow: hidden;
   white-space: nowrap;
   mask-image: linear-gradient(90deg, #000 85%, transparent);
+  transition:
+    opacity 0.16s ease,
+    max-width 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .tab-audio,
@@ -275,6 +291,10 @@ body.linux #tabstrip {
 }
 .tab-close {
   opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    width 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 0.15s ease;
 }
 .tab:hover .tab-close,
 .tab.active .tab-close {
@@ -291,11 +311,21 @@ body.linux #tabstrip {
   width: 44px;
   min-width: 44px;
   justify-content: center;
+  gap: 0;
   padding: 0;
 }
-.tab.pinned .tab-title,
-.tab.pinned .tab-close {
-  display: none;
+/* Collapse (not display:none) so pinning animates */
+.tab.pinned .tab-title {
+  flex: 0 0 0;
+  max-width: 0;
+  opacity: 0;
+}
+.tab.pinned .tab-close,
+.tab.pinned:hover .tab-close,
+.tab.pinned.active .tab-close {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 .tab.pinned .tab-audio {
   position: absolute;
@@ -801,4 +831,13 @@ body.private #private-badge {
 }
 .update-btn:hover {
   filter: brightness(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }

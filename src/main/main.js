@@ -390,6 +390,11 @@ function registerIpc() {
   ipcMain.on('gesture:navigate', (event, direction) => {
     const found = registry.tabByWebContentsId(event.sender.id);
     if (!found || found.tab.id !== found.kwin.activeId) return;
+    // macOS momentum keeps scrolling into the page we just navigated to, which
+    // would read as a second swipe and go back twice. Ignore it for a moment.
+    const now = Date.now();
+    if (now - (found.tab.lastGestureAt || 0) < 900) return;
+    found.tab.lastGestureAt = now;
     if (direction === 'back') found.kwin.goBack();
     if (direction === 'forward') found.kwin.goForward();
   });

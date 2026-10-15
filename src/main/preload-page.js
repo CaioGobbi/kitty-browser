@@ -35,12 +35,21 @@ if (location.protocol === 'kitty:') {
 // Swipe back/forward: a two-finger horizontal swipe on the trackpad arrives as
 // horizontal wheel events. When the page itself can't scroll that way, Kitty
 // navigates — with an arrow at the edge that follows the fingers, like Safari.
+//
+// Wheel events don't say when the fingers leave the trackpad, and macOS keeps
+// sending "momentum" events for up to a second afterwards. Waiting for those
+// to end felt laggy, so the gesture commits as soon as it's clearly over: the
+// speed drops well below its peak (the fingers lifted and momentum is decaying)
+// or the events stop for a moment.
 
-const SWIPE_DISTANCE = 160; // px of horizontal scrolling needed to navigate
-const GESTURE_GAP = 350; // ms without wheel events = the gesture is over
+const SWIPE_DISTANCE = 140; // px of horizontal scrolling needed to navigate
+const RELEASE_SLOWDOWN = 0.75; // speed below 75% of the gesture's peak = released
+const RELEASE_PAUSE = 90; // ms without events = released
+const GESTURE_GAP = 280; // ms without events = a new gesture may start
 
 let swipe = null;
-let swipeTimer = null;
+let releaseTimer = null;
+let gapTimer = null;
 let indicator = null;
 
 /** Could the element under the pointer (or an ancestor) still scroll this way? */
@@ -55,63 +64,89 @@ function canScrollHorizontally(target, deltaX) {
   return false;
 }
 
-function showIndicator(direction, progress) {
-  if (!indicator) {
-    indicator = document.createElement('kitty-swipe');
-    const s = indicator.style;
-    s.position = 'fixed';
-    s.top = '50%';
-    s.zIndex = '2147483647';
-    s.width = '44px';
-    s.height = '44px';
-    s.marginTop = '-22px';
-    s.borderRadius = '50%';
-    s.display = 'grid';
-    s.placeItems = 'center';
-    s.pointerEvents = 'none';
-    s.font = '600 22px -apple-system, "Segoe UI", sans-serif';
-    s.color = '#fff';
-    s.boxShadow = '0 6px 18px rgba(0,0,0,.3)';
-    s.transition = 'background .12s';
-    document.documentElement.append(indicator);
-  }
-  const s = indicator.style;
-  const ready = progress >= 1;
-  s.background = ready ? '#ff7a45' : 'rgba(40,36,50,.82)';
-  s.opacity = String(Math.min(1, progress * 1.4));
-  indicator.textContent = direction === 'back' ? '←' : '→';
-  const offset = -44 + Math.min(1, progress) * 60;
-  s.left = direction === 'back' ? `${offset}px` : 'auto';
-  s.right = direction === 'forward' ? `${offset}px` : 'auto';
+function createIndicator() {
+  const el = document.createElement('kitty-swipe');
+  const s = el.style;
+  s.position = 'fixed';
+  s.top = '50%';
+  s.left = '0';
+  s.zIndex = '2147483647';
+  s.width = '46px';
+  s.height = '46px';
+  s.marginTop = '-23px';
+  s.borderRadius = '50%';
+  s.display = 'grid';
+  s.placeItems = 'center';
+  s.pointerEvents = 'none';
+  s.font = '600 22px -apple-system, "Segoe UI", sans-serif';
+  s.color = '#fff';
+  s.boxShadow = '0 6px 20px rgba(0,0,0,.28)';
+  s.willChange = 'transform, opacity';
+  s.transition = 'background-color .15s ease, transform .06s linear, opacity .06s linear';
+  document.documentElement.append(el);
+  return el;
 }
 
-function endSwipe() {
-  if (swipe && !swipe.done && Math.abs(swipe.dx) >= SWIPE_DISTANCE) {
-    ipcRenderer.send('gesture:navigate', swipe.dx < 0 ? 'back' : 'forward');
-  }
-  swipe = null;
-  indicator?.remove();
+function showIndicator(direction, progress) {
+  indicator ??= createIndicator();
+  const p = Math.min(1, progress);
+  const ready = progress >= 1;
+  const travel = -46 + p * 64; // slides in from the edge
+  const x = direction === 'back' ? travel : innerWidth - 46 - travel;
+  const s = indicator.style;
+  s.background = ready ? '#ff7a45' : 'rgba(40,36,50,.82)';
+  s.opacity = String(Math.min(1, p * 1.6));
+  s.transform = `translateX(${x}px) scale(${0.7 + p * 0.3 + (ready ? 0.06 : 0)})`;
+  indicator.textContent = direction === 'back' ? '←' : '→';
+}
+
+function hideIndicator(committed) {
+  const el = indicator;
   indicator = null;
+  if (!el) return;
+  el.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1), opacity .22s ease';
+  el.style.opacity = '0';
+  el.style.transform += committed ? ' scale(1.25)' : ' scale(.6)';
+  setTimeout(() => el.remove(), 240);
+}
+
+function release() {
+  clearTimeout(releaseTimer);
+  if (!swipe || swipe.done) return;
+  swipe.done = true;
+  const committed = Math.abs(swipe.dx) >= SWIPE_DISTANCE;
+  hideIndicator(committed);
+  if (committed) ipcRenderer.send('gesture:navigate', swipe.dx < 0 ? 'back' : 'forward');
 }
 
 window.addEventListener(
   'wheel',
   (e) => {
     if (e.ctrlKey || e.deltaMode !== 0) return; // pinch-zoom, or a mouse wheel in lines/pages
-    clearTimeout(swipeTimer);
-    swipeTimer = setTimeout(endSwipe, GESTURE_GAP);
-    const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.5;
+    clearTimeout(gapTimer);
+    gapTimer = setTimeout(() => {
+      release();
+      swipe = null;
+    }, GESTURE_GAP);
     if (!swipe) {
-      if (!horizontal || canScrollHorizontally(e.target, e.deltaX)) {
-        swipe = { dx: 0, done: true }; // this gesture belongs to the page
-        return;
-      }
-      swipe = { dx: 0, done: false };
+      const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.5;
+      // Not a horizontal swipe, or the page scrolls sideways itself: leave it alone.
+      swipe = { dx: 0, peak: 0, done: !horizontal || canScrollHorizontally(e.target, e.deltaX) };
     }
-    if (swipe.done) return;
+    if (swipe.done) return; // momentum after the release, or the page's own gesture
+
     swipe.dx += e.deltaX;
+    const speed = Math.abs(e.deltaX);
+    swipe.peak = Math.max(swipe.peak, speed);
     // Natural scrolling: fingers moving right scroll left (negative deltaX) → back.
     showIndicator(swipe.dx < 0 ? 'back' : 'forward', Math.abs(swipe.dx) / SWIPE_DISTANCE);
+
+    if (Math.abs(swipe.dx) >= SWIPE_DISTANCE && swipe.peak > 4 && speed < swipe.peak * RELEASE_SLOWDOWN) {
+      release();
+      return;
+    }
+    clearTimeout(releaseTimer);
+    releaseTimer = setTimeout(release, RELEASE_PAUSE);
   },
   { passive: true, capture: true },
 );

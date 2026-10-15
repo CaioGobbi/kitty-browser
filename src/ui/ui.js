@@ -148,48 +148,130 @@ function displayUrl(tab) {
   return tab.url.replace(/\/$/, '');
 }
 
+// ---- Tab animations ------------------------------------------------------
+// Sizes animate with CSS transitions; position changes use FLIP: remember where
+// every tab was, change the DOM, then slide each one from its old spot.
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const EASE = 'cubic-bezier(.2, .8, .2, 1)';
+const liveTabs = () => [...tabsEl.children].filter((node) => !node.classList.contains('closing'));
+let firstRender = true;
+
+function animateLayout(change, { except } = {}) {
+  if (reduceMotion.matches) return change();
+  const before = new Map(liveTabs().map((node) => [node, node.getBoundingClientRect()]));
+  change();
+
+  // A tab that changed size *and* moved (pinning) lost its CSS transition when
+  // it was re-inserted, so its size is animated here too. Positions are then
+  // measured with those tabs held at their old size: the size animation moves
+  // the neighbours itself, and the slide only has to cover the rest.
+  const resized = [];
+  for (const node of liveTabs()) {
+    const old = before.get(node);
+    if (!old || node === except) continue;
+    const width = node.getBoundingClientRect().width;
+    if (Math.abs(width - old.width) < 1) continue;
+    resized.push([node, old.width, width]);
+    node.style.minWidth = node.style.maxWidth = `${old.width}px`;
+  }
+  const after = new Map(liveTabs().map((node) => [node, node.getBoundingClientRect().left]));
+  for (const [node] of resized) node.style.minWidth = node.style.maxWidth = '';
+
+  const timing = { duration: 260, easing: EASE };
+  for (const node of liveTabs()) {
+    if (node === except || !before.has(node)) continue;
+    const dx = before.get(node).left - after.get(node);
+    if (Math.abs(dx) >= 1) node.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], timing);
+  }
+  for (const [node, from, to] of resized) {
+    node.animate(
+      [
+        { minWidth: `${from}px`, maxWidth: `${from}px` },
+        { minWidth: `${to}px`, maxWidth: `${to}px` },
+      ],
+      timing,
+    );
+  }
+}
+
+function animateIn(node) {
+  if (reduceMotion.matches) return;
+  const width = node.getBoundingClientRect().width;
+  node.animate(
+    [
+      { maxWidth: '0px', minWidth: '0px', opacity: 0 },
+      { maxWidth: `${width}px`, minWidth: '0px', opacity: 1 },
+    ],
+    { duration: 220, easing: EASE },
+  );
+}
+
+function animateOut(node) {
+  node.classList.add('closing');
+  if (reduceMotion.matches) return node.remove();
+  const width = node.getBoundingClientRect().width;
+  const animation = node.animate(
+    [
+      { maxWidth: `${width}px`, minWidth: '0px', opacity: 1 },
+      { maxWidth: '0px', minWidth: '0px', opacity: 0, paddingLeft: '0px', paddingRight: '0px', marginRight: '0px' },
+    ],
+    { duration: 200, easing: EASE, fill: 'forwards' },
+  );
+  animation.onfinish = () => node.remove();
+}
+
 function renderTabs() {
-  const existing = new Map([...tabsEl.children].map((node) => [Number(node.dataset.id), node]));
+  const existing = new Map(liveTabs().map((node) => [Number(node.dataset.id), node]));
+  const added = [];
   const pinnedWidth = state.tabs.filter((t) => t.pinned).length * 46;
   const narrow = state.tabs.filter((t) => !t.pinned).length * 110 > tabsEl.parentElement.clientWidth - 220 - pinnedWidth;
   const lastPinned = state.tabs.filter((t) => t.pinned).at(-1)?.id;
 
-  state.tabs.forEach((tab, i) => {
-    let node = existing.get(tab.id);
-    if (!node) node = createTabNode(tab.id);
-    existing.delete(tab.id);
-    if (!dragging && tabsEl.children[i] !== node) tabsEl.insertBefore(node, tabsEl.children[i] || null);
-
-    node.classList.toggle('active', tab.id === state.activeTabId);
-    node.classList.toggle('narrow', narrow);
-    node.classList.toggle('pinned', !!tab.pinned);
-    node.classList.toggle('last-pinned', tab.id === lastPinned);
-    node.setAttribute('aria-selected', String(tab.id === state.activeTabId));
-    node.title = tab.title;
-    node.querySelector('.tab-title').textContent = tab.title;
-
-    const audio = node.querySelector('.tab-audio');
-    audio.hidden = !tab.audible && !tab.muted;
-    audio.innerHTML = tab.muted ? ICONS.muted : ICONS.audio;
-    audio.title = tab.muted ? 'Ativar som da aba' : 'Silenciar aba';
-
-    const iconKey = tab.loading ? 'loading' : tab.internal ? 'kitty' : tab.favicon || 'none';
-    const icon = node.querySelector('.tab-icon');
-    if (icon.dataset.key !== iconKey) {
-      icon.dataset.key = iconKey;
-      if (tab.loading) icon.innerHTML = '<span class="spinner"></span>';
-      else if (tab.internal) icon.innerHTML = ICONS.kitty;
-      else if (!tab.favicon) icon.innerHTML = ICONS.globe;
-      else {
-        const img = new Image();
-        img.src = tab.favicon;
-        img.onerror = () => (icon.innerHTML = ICONS.globe);
-        icon.replaceChildren(img);
+  animateLayout(() => {
+    state.tabs.forEach((tab, i) => {
+      let node = existing.get(tab.id);
+      if (!node) {
+        node = createTabNode(tab.id);
+        added.push(node);
       }
-    }
+      existing.delete(tab.id);
+      const live = liveTabs();
+      if (!dragging && live[i] !== node) tabsEl.insertBefore(node, live[i] || null);
+
+      node.classList.toggle('active', tab.id === state.activeTabId);
+      node.classList.toggle('narrow', narrow);
+      node.classList.toggle('pinned', !!tab.pinned);
+      node.classList.toggle('last-pinned', tab.id === lastPinned);
+      node.setAttribute('aria-selected', String(tab.id === state.activeTabId));
+      node.title = tab.title;
+      node.querySelector('.tab-title').textContent = tab.title;
+
+      const audio = node.querySelector('.tab-audio');
+      audio.hidden = !tab.audible && !tab.muted;
+      audio.innerHTML = tab.muted ? ICONS.muted : ICONS.audio;
+      audio.title = tab.muted ? 'Ativar som da aba' : 'Silenciar aba';
+
+      const iconKey = tab.loading ? 'loading' : tab.internal ? 'kitty' : tab.favicon || 'none';
+      const icon = node.querySelector('.tab-icon');
+      if (icon.dataset.key !== iconKey) {
+        icon.dataset.key = iconKey;
+        if (tab.loading) icon.innerHTML = '<span class="spinner"></span>';
+        else if (tab.internal) icon.innerHTML = ICONS.kitty;
+        else if (!tab.favicon) icon.innerHTML = ICONS.globe;
+        else {
+          const img = new Image();
+          img.src = tab.favicon;
+          img.onerror = () => (icon.innerHTML = ICONS.globe);
+          icon.replaceChildren(img);
+        }
+      }
+    });
   });
 
-  existing.forEach((node) => node.remove());
+  if (!firstRender) added.forEach(animateIn);
+  existing.forEach(animateOut);
+  firstRender = false;
 }
 
 function createTabNode(id) {
@@ -228,14 +310,20 @@ function startTabDrag(down, node, id) {
     }
     const left = e.clientX - grab;
     const center = left + node.offsetWidth / 2;
-    for (const sibling of tabsEl.children) {
-      if (sibling === node) continue;
-      const r = sibling.getBoundingClientRect();
-      const mid = r.left + r.width / 2;
-      const isAfterNode = node.compareDocumentPosition(sibling) & Node.DOCUMENT_POSITION_FOLLOWING;
-      if (isAfterNode && center > mid) tabsEl.insertBefore(sibling, node);
-      else if (!isAfterNode && center < mid) tabsEl.insertBefore(node, sibling);
-    }
+    // Siblings glide out of the way instead of jumping.
+    animateLayout(
+      () => {
+        for (const sibling of liveTabs()) {
+          if (sibling === node) continue;
+          const r = sibling.getBoundingClientRect();
+          const mid = r.left + r.width / 2;
+          const isAfterNode = node.compareDocumentPosition(sibling) & Node.DOCUMENT_POSITION_FOLLOWING;
+          if (isAfterNode && center > mid) tabsEl.insertBefore(sibling, node);
+          else if (!isAfterNode && center < mid) tabsEl.insertBefore(node, sibling);
+        }
+      },
+      { except: node },
+    );
     node.style.transform = '';
     node.style.transform = `translateX(${left - node.getBoundingClientRect().left}px)`;
   };
@@ -244,9 +332,12 @@ function startTabDrag(down, node, id) {
     window.removeEventListener('pointerup', onUp);
     if (!started) return;
     node.classList.remove('dragging');
+    const offset = node.style.transform;
     node.style.transform = '';
+    // Settle into the slot instead of snapping.
+    if (!reduceMotion.matches && offset) node.animate([{ transform: offset }, { transform: 'none' }], { duration: 180, easing: EASE });
     dragging = null;
-    api.moveTab(id, [...tabsEl.children].indexOf(node));
+    api.moveTab(id, liveTabs().indexOf(node));
   };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
