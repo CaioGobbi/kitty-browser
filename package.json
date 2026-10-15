@@ -16,7 +16,7 @@
     "postinstall": "node node_modules/electron/install.js",
     "evs-signup": ".venv/bin/python -m castlabs_evs.account signup",
     "dist:win": "electron-builder --win nsis --x64",
-    "release:win": "electron-builder --win nsis --x64 --publish always"
+    "release:win": "sh scripts/release-win.sh"
   },
   "license": "MPL-2.0",
   "devDependencies": {
@@ -75,7 +75,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "caiogobbi",
+        "owner": "CaioGobbi",
         "repo": "kitty-browser",
         "releaseType": "release"
       }

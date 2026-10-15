@@ -2,6 +2,14 @@
 
 Um navegador rápido e focado em privacidade, construído sobre o Chromium (via Electron) — na mesma linha do Brave.
 
+## Baixar
+
+**Windows 10/11 (64 bits):** baixe o `Kitty-Setup-*.exe` da [versão mais recente](https://github.com/CaioGobbi/kitty-browser/releases/latest). O Kitty se atualiza sozinho depois de instalado.
+
+> O instalador ainda não tem assinatura digital, então o Windows SmartScreen avisa na primeira vez: clique em **Mais informações → Executar assim mesmo**.
+
+**macOS (Apple Silicon):** por enquanto, gere o app a partir do código (veja abaixo).
+
 ## Rodando
 
 ```bash
@@ -21,7 +29,7 @@ Gera o `Kitty.app` (Apple Silicon), assina localmente e copia para `/Application
 npm run dist:win
 ```
 
-Gera `out/windows/Kitty-Setup-<versão>.exe` (Windows 10/11, 64 bits), dá para gerar direto do Mac. O instalador:
+Gera `out/windows/Kitty-Setup-<versão>.exe` (Windows 10/11, 64 bits), dá para gerar direto do Mac. Para publicar uma versão nova (que os Kitty instalados baixam sozinhos), suba a versão no `package.json`, faça o commit e rode `npm run release:win` (precisa do `gh auth login`). O instalador:
 - instala só para o usuário atual (sem pedir administrador), com atalhos na área de trabalho e no menu Iniciar;
 - registra o Kitty como navegador, para ele aparecer em Configurações → Apps → Aplicativos padrão;
 - remove tudo isso ao desinstalar (seus dados ficam em `%APPDATA%\Kitty`).
@@ -106,3 +114,7 @@ scripts/    geração do ícone
 ```
 
 Dados do usuário ficam em `~/Library/Application Support/Kitty`.
+
+## Licença
+
+[MPL-2.0](LICENSE), a mesma do Firefox.
