@@ -17,8 +17,8 @@ const CLOSED_TABS_LIMIT = 25;
 
 let privateCounter = 0;
 
-/** Set by main.js: { setupProfile(ses, opts), onChange(), contextMenu(kwin, tab, params), shortcut(input) } */
-const hooks = { setupProfile() {}, onChange() {}, contextMenu() {}, shortcut: () => false };
+/** Set by main.js: { setupProfile(ses, opts), onChange(), contextMenu(kwin, tab, params), shortcut(input), favicon(ses, pageUrl, iconUrl) } */
+const hooks = { setupProfile() {}, onChange() {}, contextMenu() {}, shortcut: () => false, favicon() {} };
 
 /** Windows/Linux draw the minimize/maximize/close buttons over the tab strip: match its colors. */
 function titleBarOverlay(isPrivate) {
@@ -309,6 +309,7 @@ class KittyWindow {
     wc.on('page-favicon-updated', (_e, favicons) => {
       tab.favicon = favicons[0] || null;
       tab.faviconOrigin = originOf(wc.getURL());
+      if (!this.isPrivate && tab.favicon) hooks.favicon(this.session, wc.getURL(), tab.favicon);
       this.sendState();
     });
     wc.on('did-start-loading', () => this.sendState());

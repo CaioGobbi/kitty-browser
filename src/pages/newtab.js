@@ -42,6 +42,18 @@ window.kitty.stats().then((stats) => {
     const letter = document.createElement('span');
     letter.className = 'letter';
     letter.textContent = site.host.charAt(0) || '?';
+    if (site.favicon) {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.src = site.favicon;
+      // Broken icon: keep the letter.
+      img.addEventListener('error', () => {
+        img.remove();
+        letter.classList.remove('has-icon');
+      });
+      letter.classList.add('has-icon');
+      letter.append(img);
+    }
     const name = document.createElement('span');
     name.textContent = site.host;
     a.append(letter, name);

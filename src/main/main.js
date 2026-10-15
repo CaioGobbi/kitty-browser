@@ -105,6 +105,23 @@ async function inlineFavicon(ses, url) {
   }
 }
 
+const FAVICON_LIMIT = 300;
+
+/** Keeps the latest favicon of each visited site (inlined), for the new tab page. */
+async function rememberFavicon(ses, pageUrl, iconUrl) {
+  const host = hostOf(pageUrl);
+  if (!host || !/^https?:/.test(pageUrl)) return;
+  const icons = data.favicons.get('icons');
+  if (icons[host]?.src === iconUrl) return;
+  const icon = await inlineFavicon(ses, iconUrl);
+  if (!icon) return;
+  delete icons[host]; // re-insert so the oldest hosts are dropped first
+  icons[host] = { src: iconUrl, data: icon };
+  const hosts = Object.keys(icons);
+  for (const old of hosts.slice(0, Math.max(0, hosts.length - FAVICON_LIMIT))) delete icons[old];
+  data.favicons.save();
+}
+
 // ---------------------------------------------------------------------------
 // Windows
 
@@ -316,7 +333,10 @@ function broadcastSettings() {
 
 async function clearBrowsingData(kinds) {
   const ses = session.fromPartition('persist:kitty');
-  if (kinds.includes('history')) data.history.set('entries', []);
+  if (kinds.includes('history')) {
+    data.history.set('entries', []);
+    data.favicons.set('icons', {});
+  }
   if (kinds.includes('cookies')) await ses.clearStorageData();
   if (kinds.includes('cache')) await ses.clearCache();
   if (kinds.includes('downloads')) downloads.clearFinished();
@@ -431,7 +451,9 @@ function registerIpc() {
     data.history.set('entries', data.history.get('entries').filter((e) => e.time !== time));
   });
   ipcMain.handle('kitty:history-clear', (event) => {
-    if (fromPage(event, 'history')) data.history.set('entries', []);
+    if (!fromPage(event, 'history')) return;
+    data.history.set('entries', []);
+    data.favicons.set('icons', {});
   });
   ipcMain.handle('kitty:stats', (event) => {
     if (!fromPage(event, 'newtab')) return null;
@@ -443,7 +465,7 @@ function registerIpc() {
         const host = hostOf(e.url);
         if (seen.has(host)) continue;
         seen.add(host);
-        recent.push({ host, url: e.url, title: e.title });
+        recent.push({ host, url: e.url, title: e.title, favicon: data.favicons.get('icons')[host]?.data || null });
         if (recent.length === 8) break;
       }
     }
@@ -585,6 +607,7 @@ app.whenReady().then(async () => {
   hooks.onChange = persistSession;
   hooks.contextMenu = menus.pageContextMenu;
   hooks.shortcut = menus.handleShortcut;
+  hooks.favicon = rememberFavicon;
   Object.assign(menus.actions, {
     newWindow,
     newPrivateWindow,

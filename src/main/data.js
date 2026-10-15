@@ -75,6 +75,7 @@ const data = {
   /** @type {Store} */ bookmarks: null,
   /** @type {Store} */ session: null,
   /** @type {Store} */ downloads: null,
+  /** @type {Store} */ favicons: null,
 };
 
 function initData(userData) {
@@ -83,6 +84,7 @@ function initData(userData) {
   data.bookmarks = new Store(path.join(userData, 'bookmarks.json'), { items: [] });
   data.session = new Store(path.join(userData, 'session.json'), { windows: [] });
   data.downloads = new Store(path.join(userData, 'downloads.json'), { items: [] });
+  data.favicons = new Store(path.join(userData, 'favicons.json'), { icons: {} }); // { [host]: { src, data } }
   if (!(data.settings.get('searchEngine') in SEARCH_ENGINES)) data.settings.set('searchEngine', 'duckduckgo');
 }
 
