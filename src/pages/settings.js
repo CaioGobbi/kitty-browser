@@ -166,11 +166,60 @@ $('check-update').addEventListener('click', async () => {
 });
 $('open-downloads').addEventListener('click', () => settings.openDownloads());
 $('clear').addEventListener('click', async () => {
-  const kinds = [...document.querySelectorAll('.checks input:checked')].map((i) => i.value);
+  const kinds = [...document.querySelectorAll('#clear-kinds input:checked')].map((i) => i.value);
   if (!kinds.length || !confirm('Apagar os dados selecionados? Isso não pode ser desfeito.')) return;
   render(await settings.clearData(kinds));
   $('cleared').hidden = false;
   setTimeout(() => ($('cleared').hidden = true), 3000);
 });
 
+// ---- Import from another browser
+async function loadImportSources() {
+  const { sources, blocked } = await settings.importSources();
+  const select = $('import-source');
+  select.replaceChildren(
+    ...sources.map((s) => {
+      const option = document.createElement('option');
+      option.value = s.id;
+      option.textContent = s.name;
+      return option;
+    }),
+  );
+  select.disabled = $('import').disabled = sources.length === 0;
+  if (!sources.length) {
+    $('import-hint').textContent = blocked.length
+      ? 'O macOS não deixou o Kitty ler os dados dos outros navegadores.'
+      : 'Nenhum outro navegador encontrado neste computador.';
+  }
+  $('import-blocked').hidden = blocked.length === 0;
+  $('import-blocked-text').textContent =
+    `Para importar do ${blocked.join(', ').replace(/, ([^,]*)$/, ' e $1')}, ative o Kitty em ` +
+    'Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco e reabra o Kitty.';
+}
+
+$('import-privacy').addEventListener('click', () => settings.importOpenPrivacy());
+
+$('import').addEventListener('click', async (e) => {
+  const kinds = [...document.querySelectorAll('#importar .checks input:checked')].map((i) => i.value);
+  if (!kinds.length) return;
+  const status = $('import-status');
+  e.target.disabled = true;
+  status.textContent = 'Importando…';
+  const r = await settings.importRun($('import-source').value, kinds);
+  e.target.disabled = false;
+  if (!r || r.error) {
+    status.textContent = r?.error || 'Não foi possível importar.';
+    return;
+  }
+  if (!r.bookmarks && !r.history) {
+    status.textContent = 'Nada novo para importar: o Kitty já tem tudo isso.';
+    return;
+  }
+  const parts = [];
+  if (kinds.includes('bookmarks')) parts.push(`${r.bookmarks} ${r.bookmarks === 1 ? 'favorito' : 'favoritos'}`);
+  if (kinds.includes('history')) parts.push(`${r.history} ${r.history === 1 ? 'página' : 'páginas'} do histórico`);
+  status.textContent = `Pronto: ${parts.join(' e ')} ${r.bookmarks + r.history === 1 ? 'importado' : 'importados'}.`;
+});
+
 settings.get().then(render);
+loadImportSources();

@@ -27,6 +27,24 @@
         </div>
       </section>
 
+      <section id="importar">
+        <h2>Importar de outro navegador</h2>
+        <label class="row">
+          <span><strong>Navegador</strong><small id="import-hint">Traz favoritos e histórico salvos no computador. Nada é enviado pela internet.</small></span>
+          <select id="import-source"></select>
+        </label>
+        <div class="checks">
+          <label><input type="checkbox" value="bookmarks" checked /> Favoritos</label>
+          <label><input type="checkbox" value="history" checked /> Histórico</label>
+        </div>
+        <p id="import-blocked" hidden>
+          <span id="import-blocked-text"></span>
+          <button id="import-privacy">Abrir Ajustes do Sistema</button>
+        </p>
+        <button id="import">Importar</button>
+        <span id="import-status" class="status"></span>
+      </section>
+
       <section>
         <h2>Busca</h2>
         <label class="row">
@@ -90,7 +108,7 @@
 
       <section>
         <h2>Limpar dados de navegação</h2>
-        <div class="checks">
+        <div class="checks" id="clear-kinds">
           <label><input type="checkbox" value="history" checked /> Histórico</label>
           <label><input type="checkbox" value="cookies" checked /> Cookies e dados de sites</label>
           <label><input type="checkbox" value="cache" checked /> Imagens e arquivos em cache</label>

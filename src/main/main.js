@@ -13,6 +13,7 @@ const downloads = require('./downloads');
 const lists = require('./lists');
 const updater = require('./updater');
 const gestures = require('./gestures');
+const importer = require('./importer');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 
@@ -384,6 +385,7 @@ function registerIpc() {
     else w.navigate(b.url);
   });
   ui('bookmark:menu', (w, id) => menus.bookmarkContextMenu(w, id));
+  ui('bookmark:folder', (w, { name, x, y } = {}) => menus.bookmarkFolderMenu(w, String(name), x, y));
   ui('downloads:action', (_w, { id, what } = {}) => downloads.action(id, what));
   ui('downloads:clear', () => downloads.clearFinished());
 
@@ -512,6 +514,30 @@ function registerIpc() {
   });
   ipcMain.handle('kitty:settings-open-downloads', (event) => {
     if (fromPage(event, 'settings')) shell.openPath(app.getPath('downloads'));
+  });
+  ipcMain.handle('kitty:import-sources', (event) => {
+    if (!fromPage(event, 'settings')) return { sources: [], blocked: [] };
+    return {
+      sources: importer.listSources().map(({ id, name }) => ({ id, name })),
+      blocked: importer.blockedBrowsers(),
+    };
+  });
+  ipcMain.handle('kitty:import-open-privacy', (event) => {
+    // macOS only lets Kitty read other browsers' data with Full Disk Access.
+    if (fromPage(event, 'settings') && process.platform === 'darwin') {
+      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
+    }
+  });
+  ipcMain.handle('kitty:import-run', (event, id, kinds) => {
+    if (!fromPage(event, 'settings') || !Array.isArray(kinds)) return null;
+    try {
+      const result = importer.importFrom(String(id), kinds.map(String), { bookmarks: data.bookmarks, history: data.history });
+      broadcastBookmarks(); // even with nothing new, older imports may have gained folders
+      return result;
+    } catch (err) {
+      console.error('import failed', err);
+      return { error: err.message };
+    }
   });
 }
 

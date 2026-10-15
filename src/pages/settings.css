@@ -78,6 +78,8 @@ select {
 .none { color: var(--muted); padding: 6px 0; }
 .checks { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 16px; }
 .checks input { accent-color: var(--accent); }
+#import-blocked { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 0 0 16px; color: var(--muted); }
+#import-blocked[hidden] { display: none; }
 .danger { color: var(--danger); }
-#cleared { margin-left: 10px; color: var(--muted); }
+#cleared, .status { margin-left: 10px; color: var(--muted); }
 .about { color: var(--muted); font-size: 12px; text-align: center; }

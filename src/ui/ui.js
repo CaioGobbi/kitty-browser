@@ -508,22 +508,49 @@ function moveSuggestion(delta) {
 // ---------------------------------------------------------------------------
 // Bookmarks bar
 
+function bookmarkButton(b) {
+  const button = el('button', 'bookmark');
+  button.title = `${b.title}\n${b.url}`;
+  button.append(faviconOrLetter(b.url, b.favicon), el('span', '', b.title || b.url));
+  button.addEventListener('click', (e) => api.openBookmark({ id: b.id, newTab: e.metaKey || e.ctrlKey }));
+  button.addEventListener('auxclick', (e) => e.button === 1 && api.openBookmark({ id: b.id, newTab: true }));
+  button.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    api.bookmarkMenu(b.id);
+  });
+  return button;
+}
+
+/** A folder of imported bookmarks: opens a native menu with its contents right below it. */
+function folderButton(name) {
+  const button = el('button', 'bookmark folder');
+  button.title = name;
+  const icon = el('span', 'icon');
+  icon.innerHTML = ICONS.folder;
+  button.append(icon, el('span', '', name));
+  button.addEventListener('click', () => {
+    const rect = button.getBoundingClientRect();
+    api.bookmarkFolder({ name, x: rect.left, y: rect.bottom });
+  });
+  return button;
+}
+
 function renderBookmarks() {
-  bookmarksBar.hidden = !uiSettings.showBookmarksBar || bookmarks.length === 0;
-  bookmarksBar.replaceChildren(
-    ...bookmarks.map((b) => {
-      const button = el('button', 'bookmark');
-      button.title = `${b.title}\n${b.url}`;
-      button.append(faviconOrLetter(b.url, b.favicon), el('span', '', b.title || b.url));
-      button.addEventListener('click', (e) => api.openBookmark({ id: b.id, newTab: e.metaKey || e.ctrlKey }));
-      button.addEventListener('auxclick', (e) => e.button === 1 && api.openBookmark({ id: b.id, newTab: true }));
-      button.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        api.bookmarkMenu(b.id);
-      });
-      return button;
-    }),
-  );
+  // Imported bookmarks that weren't on the other browser's bar only show in kitty://bookmarks.
+  const onBar = bookmarks.filter((b) => b.bar !== false);
+  bookmarksBar.hidden = !uiSettings.showBookmarksBar || onBar.length === 0;
+  // Loose bookmarks as buttons; each top-level folder once, where its first bookmark is.
+  const folders = new Set();
+  const buttons = [];
+  for (const b of onBar) {
+    const name = b.folder?.[0];
+    if (name == null) buttons.push(bookmarkButton(b));
+    else if (!folders.has(name)) {
+      folders.add(name);
+      buttons.push(folderButton(name));
+    }
+  }
+  bookmarksBar.replaceChildren(...buttons);
 }
 
 // ---------------------------------------------------------------------------

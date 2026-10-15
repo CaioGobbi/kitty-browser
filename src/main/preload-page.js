@@ -27,6 +27,9 @@ if (location.protocol === 'kitty:') {
       openDownloads: invoke('kitty:settings-open-downloads'),
       updateLists: invoke('kitty:settings-update-lists'),
       checkUpdate: invoke('kitty:settings-check-update'),
+      importSources: invoke('kitty:import-sources'),
+      importRun: invoke('kitty:import-run'),
+      importOpenPrivacy: invoke('kitty:import-open-privacy'),
     },
   });
 }

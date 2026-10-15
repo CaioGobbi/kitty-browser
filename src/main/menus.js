@@ -1,6 +1,6 @@
 'use strict';
 
-const { Menu, clipboard, dialog } = require('electron');
+const { Menu, clipboard, dialog, nativeImage } = require('electron');
 
 const { data, engine, searchUrl } = require('./data');
 const { registry } = require('./registry');
@@ -95,6 +95,8 @@ function buildAppMenu() {
       submenu: [
         { label: 'Adicionar/remover favorito', accelerator: 'CmdOrCtrl+D', click: withWin((w) => actions.toggleBookmark(w)) },
         { label: 'Gerenciar favoritos', accelerator: 'Alt+CmdOrCtrl+B', click: () => actions.openInternal('kitty://bookmarks') },
+        { type: 'separator' },
+        { label: 'Importar de outro navegador…', click: () => actions.openInternal('kitty://settings#importar') },
       ],
     },
     {
@@ -365,4 +367,56 @@ function bookmarkContextMenu(kwin, id) {
   ]).popup({ window: kwin.win });
 }
 
-module.exports = { actions, buildAppMenu, handleShortcut, pageContextMenu, tabContextMenu, bookmarkContextMenu };
+/** Native menu image for a bookmark's inlined favicon (null when there's none, or it can't be decoded). */
+function menuIcon(favicon) {
+  if (!favicon?.startsWith('data:')) return null;
+  try {
+    const image = nativeImage.createFromDataURL(favicon);
+    return image.isEmpty() ? null : image.resize({ width: 16, height: 16, quality: 'best' });
+  } catch {
+    return null;
+  }
+}
+
+/** Menu labels: shortened, and with `&` kept literal on Windows/Linux (it marks access keys there). */
+function menuLabel(text) {
+  const label = text.length > 60 ? `${text.slice(0, 59)}…` : text;
+  return process.platform === 'darwin' ? label : label.replace(/&/g, '&&');
+}
+
+/** Pops up the contents of a top-level folder of the bookmarks bar, with its subfolders as submenus. */
+function bookmarkFolderMenu(kwin, name, x, y) {
+  const inFolder = data.bookmarks.get('items').filter((b) => b.bar !== false && b.folder?.[0] === name);
+  if (!inFolder.length) return;
+  // Keeps the original order: subfolders where their first bookmark appears.
+  const build = (items, depth) => {
+    const template = [];
+    const subfolders = new Map();
+    for (const b of items) {
+      const sub = b.folder[depth];
+      if (sub == null) {
+        template.push({
+          label: menuLabel(b.title || b.url),
+          icon: menuIcon(b.favicon) || undefined,
+          click: (_item, _win, event) => {
+            if (event?.metaKey || event?.ctrlKey) kwin.createTab(b.url, { activate: false });
+            else kwin.navigate(b.url);
+          },
+        });
+      } else if (!subfolders.has(sub)) {
+        const entry = { label: menuLabel(sub), items: [] };
+        subfolders.set(sub, entry);
+        template.push(entry);
+      }
+      if (sub != null) subfolders.get(sub).items.push(b);
+    }
+    return template.map((entry) =>
+      entry.items ? { label: entry.label, submenu: build(entry.items, depth + 1) } : entry,
+    );
+  };
+  const popup = { window: kwin.win };
+  if (Number.isFinite(x) && Number.isFinite(y)) Object.assign(popup, { x: Math.round(x), y: Math.round(y) });
+  Menu.buildFromTemplate(build(inFolder, 1)).popup(popup);
+}
+
+module.exports = { actions, buildAppMenu, handleShortcut, pageContextMenu, tabContextMenu, bookmarkContextMenu, bookmarkFolderMenu };

@@ -586,6 +586,16 @@ body.private #private-badge {
   font-weight: 700;
   text-transform: uppercase;
 }
+.bookmark .icon {
+  display: grid;
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.bookmark .icon svg {
+  width: 14px;
+  height: 14px;
+}
 .bookmark span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;

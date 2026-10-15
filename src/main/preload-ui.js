@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
   toggleBookmark: send('bookmark:toggle'),
   openBookmark: send('bookmark:open'),
   bookmarkMenu: send('bookmark:menu'),
+  bookmarkFolder: send('bookmark:folder'),
   downloadAction: send('downloads:action'),
   clearDownloads: send('downloads:clear'),
   installUpdate: send('update:install'),
