@@ -15,6 +15,7 @@ if (location.protocol === 'kitty:') {
     bookmarks: invoke('kitty:bookmarks'),
     removeBookmark: invoke('kitty:bookmark-remove'),
     renameBookmark: invoke('kitty:bookmark-rename'),
+    bypassThreat: invoke('kitty:threat-bypass'),
     settings: {
       get: invoke('kitty:settings'),
       set: invoke('kitty:settings-set'),
@@ -23,6 +24,7 @@ if (location.protocol === 'kitty:') {
       clearData: invoke('kitty:settings-clear'),
       makeDefaultBrowser: invoke('kitty:settings-default-browser'),
       openDownloads: invoke('kitty:settings-open-downloads'),
+      updateLists: invoke('kitty:settings-update-lists'),
     },
   });
 }

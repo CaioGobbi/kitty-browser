@@ -5,10 +5,11 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { app, components, ipcMain, net, protocol, session, shell } = require('electron');
 
-const { data, initData, flushData, engine, hostOf, isInternal, SEARCH_ENGINES, EDITABLE_SETTINGS } = require('./data');
+const { data, initData, flushData, engine, hostOf, isInternal, SEARCH_ENGINES, DNS_PROVIDERS, EDITABLE_SETTINGS } = require('./data');
 const { registry } = require('./registry');
 const privacy = require('./privacy');
 const downloads = require('./downloads');
+const lists = require('./lists');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 
@@ -47,6 +48,42 @@ function registerKittyProtocol(ses) {
     }
     return net.fetch(pathToFileURL(resolved).toString());
   });
+}
+
+/**
+ * A plain Chrome user agent. Electron's default adds "Electron/x" and the app
+ * name, which almost nobody sends — a tag that makes Kitty users stand out.
+ * Like Chrome, it only reports the major version.
+ */
+function cleanUserAgent(ua) {
+  return ua
+    .replace(/ Electron\/\S+/, '')
+    .replace(/ Kitty\/\S+/i, '')
+    .replace(/Chrome\/(\d+)\.[\d.]+/, 'Chrome/$1.0.0.0');
+}
+
+/** Encrypted DNS: falls back to the system resolver only if the provider can't be reached. */
+function applyDns() {
+  const provider = DNS_PROVIDERS[data.settings.get('secureDns')];
+  app.configureHostResolver({
+    enableBuiltInResolver: true,
+    secureDnsMode: provider ? 'automatic' : 'off',
+    secureDnsServers: provider ? [provider.url] : [],
+  });
+}
+
+/** Turns a favicon URL into a data: URL, fetched through the tab's session (shields apply). */
+async function inlineFavicon(ses, url) {
+  if (!url || url.startsWith('data:')) return url || null;
+  try {
+    const res = await ses.fetch(url, { signal: AbortSignal.timeout(5000) });
+    const type = res.headers.get('content-type') || '';
+    const body = Buffer.from(await res.arrayBuffer());
+    if (!res.ok || !type.startsWith('image/') || body.length > 64 * 1024) return null;
+    return `data:${type.split(';')[0]};base64,${body.toString('base64')}`;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -118,13 +155,31 @@ function toggleBookmark(kwin) {
   if (!/^https?:/.test(url)) return;
   const items = data.bookmarks.get('items');
   const existing = items.find((b) => b.url === url);
-  data.bookmarks.set(
-    'items',
-    existing
-      ? items.filter((b) => b !== existing)
-      : [...items, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, url, title, favicon, time: Date.now() }],
-  );
+  if (existing) {
+    data.bookmarks.set('items', items.filter((b) => b !== existing));
+    return broadcastBookmarks();
+  }
+  const bookmark = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, url, title, favicon: null, time: Date.now() };
+  data.bookmarks.set('items', [...items, bookmark]);
   broadcastBookmarks();
+  // Stored inline so the bookmarks bar never contacts the sites by itself.
+  inlineFavicon(kwin.session, favicon).then((icon) => {
+    if (!icon) return;
+    bookmark.favicon = icon;
+    data.bookmarks.save();
+    broadcastBookmarks();
+  });
+}
+
+/** Older bookmarks kept remote favicon URLs: inline them once. */
+async function inlineBookmarkFavicons() {
+  const ses = session.fromPartition('persist:kitty');
+  const remote = data.bookmarks.get('items').filter((b) => b.favicon && !b.favicon.startsWith('data:'));
+  for (const b of remote) b.favicon = await inlineFavicon(ses, b.favicon);
+  if (remote.length) {
+    data.bookmarks.save();
+    broadcastBookmarks();
+  }
 }
 
 function removeBookmark(id) {
@@ -194,6 +249,8 @@ function settingsSnapshot() {
   return {
     values: Object.fromEntries(Object.keys(EDITABLE_SETTINGS).map((k) => [k, s.get(k)])),
     engines: Object.entries(SEARCH_ENGINES).map(([id, e]) => ({ id, name: e.name, suggest: !!e.suggest })),
+    dnsProviders: Object.entries(DNS_PROVIDERS).map(([id, p]) => ({ id, name: p.name })),
+    lists: lists.status(),
     allowlist: s.get('allowlist'),
     permissions: privacy.permissionList(),
     isDefaultBrowser: isDefaultBrowser(),
@@ -349,8 +406,18 @@ function registerIpc() {
   ipcMain.handle('kitty:settings-set', (event, key, value) => {
     if (!fromPage(event, 'settings') || !EDITABLE_SETTINGS[key]?.(value)) return settingsSnapshot();
     data.settings.set(key, value);
+    if (key === 'secureDns') applyDns();
     broadcastSettings();
     return settingsSnapshot();
+  });
+  ipcMain.handle('kitty:settings-update-lists', async (event) => {
+    if (!fromPage(event, 'settings')) return null;
+    await lists.refresh({ force: true });
+    return settingsSnapshot();
+  });
+  ipcMain.handle('kitty:threat-bypass', (event, url) => {
+    if (!fromPage(event, 'blocked') || !/^https?:/.test(String(url))) return false;
+    return privacy.bypassThreat(String(url));
   });
   ipcMain.handle('kitty:settings-allowlist-remove', (event, host) => {
     if (!fromPage(event, 'settings')) return null;
@@ -402,6 +469,8 @@ app.whenReady().then(async () => {
 
   initData(app.getPath('userData'));
   downloads.loadLog();
+  app.userAgentFallback = cleanUserAgent(app.userAgentFallback);
+  applyDns();
 
   if (process.platform === 'darwin' && !app.isPackaged) {
     app.dock.setIcon(path.join(__dirname, '..', '..', 'assets', 'icon.png'));
@@ -426,7 +495,7 @@ app.whenReady().then(async () => {
   privacy.registerPrivacyIpc();
   registerIpc();
   menus.buildAppMenu();
-  const blockerReady = privacy.loadBlocker();
+  const listsReady = lists.init();
 
   const saved = data.settings.get('restoreSession') ? data.session.get('windows') : [];
   if (saved.length) for (const restore of saved) new KittyWindow({ restore });
@@ -438,7 +507,8 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (registry.windows.size === 0) new KittyWindow();
   });
-  await blockerReady;
+  await listsReady;
+  inlineBookmarkFavicons();
 });
 
 app.on('window-all-closed', () => {

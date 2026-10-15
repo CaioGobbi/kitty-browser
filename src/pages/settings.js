@@ -61,6 +61,29 @@ function render(s) {
   const hasSuggest = s.engines.find((e) => e.id === s.values.searchEngine)?.suggest;
   document.querySelector('[data-setting="searchSuggestions"]').disabled = !hasSuggest;
 
+  const dns = $('dns');
+  dns.replaceChildren(
+    ...[{ id: 'off', name: 'Desligado (DNS do sistema)' }, ...s.dnsProviders].map((p) => {
+      const option = document.createElement('option');
+      option.value = p.id;
+      option.textContent = p.name;
+      return option;
+    }),
+  );
+  dns.value = s.values.secureDns;
+
+  const ago = (t) => {
+    if (!t) return 'nunca';
+    const min = Math.round((Date.now() - t) / 60000);
+    if (min < 1) return 'agora mesmo';
+    if (min < 60) return `há ${min} min`;
+    const h = Math.round(min / 60);
+    return h < 48 ? `há ${h} h` : `há ${Math.round(h / 24)} dias`;
+  };
+  $('lists-status').textContent = s.lists.refreshing
+    ? 'Atualizando…'
+    : `Anúncios e rastreadores: ${ago(s.lists.ads)} · Sites perigosos: ${ago(s.lists.threats)}. O Kitty atualiza sozinho.`;
+
   $('default-status').textContent = !s.canBeDefault
     ? 'Disponível no app instalado (não no modo de desenvolvimento)'
     : s.isDefaultBrowser
@@ -101,6 +124,13 @@ $('make-default').addEventListener('click', async () => {
   render(await settings.makeDefaultBrowser());
   // macOS asks for confirmation in a system dialog; check again afterwards.
   setTimeout(async () => render(await settings.get()), 4000);
+});
+$('dns').addEventListener('change', async (e) => render(await settings.set('secureDns', e.target.value)));
+$('update-lists').addEventListener('click', async (e) => {
+  e.target.disabled = true;
+  $('lists-status').textContent = 'Atualizando…';
+  render(await settings.updateLists());
+  e.target.disabled = false;
 });
 $('open-downloads').addEventListener('click', () => settings.openDownloads());
 $('clear').addEventListener('click', async () => {

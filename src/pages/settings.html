@@ -42,6 +42,18 @@
       <section>
         <h2>Privacidade e escudos</h2>
         <label class="row">
+          <span><strong>Proteção contra sites perigosos</strong><small>Avisa antes de abrir sites de phishing (páginas falsas que roubam senhas) e de malware. A verificação é local: nenhum endereço que você visita é enviado a ninguém.</small></span>
+          <input type="checkbox" class="toggle" data-setting="dangerousSiteProtection" />
+        </label>
+        <label class="row">
+          <span><strong>Remover rastreadores dos links</strong><small>Tira parâmetros como utm_source, fbclid e gclid dos endereços antes de abrir</small></span>
+          <input type="checkbox" class="toggle" data-setting="stripTrackingParams" />
+        </label>
+        <label class="row">
+          <span><strong>DNS seguro</strong><small>Criptografa as consultas de DNS, para que seu provedor de internet não veja quais sites você acessa</small></span>
+          <select id="dns"></select>
+        </label>
+        <label class="row">
           <span><strong>Atualizar conexões para HTTPS</strong><small>Abre sites por HTTPS sempre que possível; volta para HTTP só se o site não suportar</small></span>
           <input type="checkbox" class="toggle" data-setting="httpsUpgrade" />
         </label>
@@ -53,6 +65,10 @@
           <span><strong>Proteção contra fingerprinting</strong><small>Adiciona um ruído imperceptível a canvas, áudio e dados do hardware, diferente em cada site. Vale a partir da próxima página aberta.</small></span>
           <input type="checkbox" class="toggle" data-setting="antiFingerprinting" />
         </label>
+        <div class="row">
+          <span><strong>Listas de proteção</strong><small id="lists-status"></small></span>
+          <button id="update-lists">Atualizar agora</button>
+        </div>
         <div class="sub-list">
           <h3>Sites com escudos desativados</h3>
           <div id="allowlist"></div>
@@ -84,7 +100,7 @@
         <span id="cleared" hidden>Pronto, dados apagados.</span>
       </section>
 
-      <p class="about">Kitty <span id="version"></span> · feito com Chromium (Electron) e as listas de bloqueio EasyList/EasyPrivacy</p>
+      <p class="about">Kitty <span id="version"></span> · feito com Chromium (Electron) e as listas EasyList, EasyPrivacy, malware-filter, URLhaus e uBlock Origin</p>
     </main>
     <script src="settings.js"></script>
   </body>

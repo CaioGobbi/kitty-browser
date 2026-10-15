@@ -1,0 +1,23 @@
+:root { --warn: #ff5d5d; }
+body { background: radial-gradient(ellipse at top, rgb(255 93 93 / 0.12), transparent 60%), var(--bg); }
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 14vh 16px 48px;
+  text-align: center;
+}
+.shield { width: 76px; height: 76px; fill: rgb(255 93 93 / 0.15); stroke: var(--warn); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+h1 { margin: 6px 0 0; font-size: 26px; }
+#lead { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.6; }
+#url { max-width: 100%; padding: 6px 10px; border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 12px; word-break: break-all; }
+.actions { margin-top: 10px; }
+.primary { padding: 10px 22px; border: 0; border-radius: 10px; background: var(--warn); color: #fff; font-weight: 600; }
+.primary:hover { background: #ff7272; }
+details { margin-top: 18px; color: var(--muted); font-size: 13px; }
+summary { cursor: pointer; }
+details p { line-height: 1.6; }
+.link { border: 0; background: none; padding: 0; color: var(--warn); text-decoration: underline; }

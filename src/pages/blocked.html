@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
+    <title>Site perigoso bloqueado</title>
+    <link rel="stylesheet" href="pages.css" />
+    <link rel="stylesheet" href="blocked.css" />
+  </head>
+  <body>
+    <main>
+      <svg class="shield" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2.5 4 5.5v6c0 5 3.4 8.9 8 10 4.6-1.1 8-5 8-10v-6z" />
+        <path d="M12 8v5M12 16v.2" />
+      </svg>
+      <h1 id="title">Site perigoso bloqueado</h1>
+      <p id="lead"></p>
+      <code id="url"></code>
+      <div class="actions">
+        <button id="back" class="primary">Voltar para um lugar seguro</button>
+      </div>
+      <details>
+        <summary>Detalhes</summary>
+        <p id="why"></p>
+        <p>Se você tem certeza de que o site é confiável, pode abri-lo assim mesmo. O Kitty vai lembrar dessa escolha até ser fechado.</p>
+        <button id="proceed" class="link">Abrir mesmo assim (não recomendado)</button>
+      </details>
+    </main>
+    <script src="blocked.js"></script>
+  </body>
+</html>

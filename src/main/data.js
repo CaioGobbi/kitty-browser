@@ -43,6 +43,16 @@ const SETTING_DEFAULTS = {
   httpsUpgrade: true,
   blockThirdPartyCookies: true,
   antiFingerprinting: true,
+  stripTrackingParams: true,
+  dangerousSiteProtection: true,
+  secureDns: 'quad9',
+};
+
+/** Encrypted DNS (DNS over HTTPS) providers. */
+const DNS_PROVIDERS = {
+  quad9: { name: 'Quad9 (bloqueia domínios maliciosos)', url: 'https://dns.quad9.net/dns-query' },
+  cloudflare: { name: 'Cloudflare (1.1.1.1)', url: 'https://cloudflare-dns.com/dns-query' },
+  mullvad: { name: 'Mullvad', url: 'https://dns.mullvad.net/dns-query' },
 };
 
 /** Settings the kitty://settings page may change, with their expected type. */
@@ -54,6 +64,9 @@ const EDITABLE_SETTINGS = {
   httpsUpgrade: (v) => typeof v === 'boolean',
   blockThirdPartyCookies: (v) => typeof v === 'boolean',
   antiFingerprinting: (v) => typeof v === 'boolean',
+  stripTrackingParams: (v) => typeof v === 'boolean',
+  dangerousSiteProtection: (v) => typeof v === 'boolean',
+  secureDns: (v) => v === 'off' || v in DNS_PROVIDERS,
 };
 
 const data = {
@@ -126,5 +139,6 @@ module.exports = {
   isShieldUp,
   isBookmarked,
   SEARCH_ENGINES,
+  DNS_PROVIDERS,
   EDITABLE_SETTINGS,
 };

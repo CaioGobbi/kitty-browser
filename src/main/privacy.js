@@ -4,16 +4,16 @@
 // HTTPS upgrades, third-party cookie blocking, Global Privacy Control,
 // fingerprinting protection and site permission prompts.
 const path = require('node:path');
-const fs = require('node:fs');
 const crypto = require('node:crypto');
-const { app, ipcMain } = require('electron');
-const { ElectronBlocker, Request, fromElectronDetails } = require('@ghostery/adblocker-electron');
+const { ipcMain } = require('electron');
+const { Request, fromElectronDetails } = require('@ghostery/adblocker-electron');
 
 const { data, isShieldUp, originOf } = require('./data');
 const { registry } = require('./registry');
+const lists = require('./lists');
 
-/** @type {ElectronBlocker | null} */
-let blocker = null;
+/** Hosts the user chose to open despite the dangerous-site warning (this run only). */
+const threatBypass = new Set();
 
 /** Hosts whose HTTPS upgrade failed this run; they load over plain HTTP. */
 const httpFallbackHosts = new Set();
@@ -87,6 +87,64 @@ function httpFallbackFor(failedUrl) {
 }
 
 // ---------------------------------------------------------------------------
+// Tracking parameters
+
+/** Query parameters that only exist to track clicks across sites. */
+const TRACKING_PARAMS = new Set([
+  'fbclid', 'gclid', 'dclid', 'gbraid', 'wbraid', 'gclsrc', 'msclkid', 'yclid', 'twclid', 'ttclid',
+  'igshid', 'igsh', 'li_fat_id', 'epik', 'srsltid', 'mc_eid', 'mc_cid', 'mkt_tok', '_hsenc', '_hsmi',
+  '__hsfp', '__hssc', '__hstc', 'hsCtaTracking', 'oly_anon_id', 'oly_enc_id', 'vero_id', 'vero_conv',
+  'rb_clickid', 's_cid', 'wickedid', '_openstat', 'ml_subscriber', 'ml_subscriber_hash', '__s',
+  'spm', 'scm', 'pk_campaign', 'pk_kwd', 'mtm_campaign', 'mtm_kwd', 'oft_id', 'oft_k', 'oft_lk',
+  'oft_d', 'oft_c', 'oft_ck', 'oft_ids', 'oft_sk', 'ref_src', 'ref_url', 'cvid', 'ncid', 'sr_share',
+]);
+const TRACKING_PREFIXES = ['utm_', 'pk_', 'mtm_', 'hsa_'];
+
+/** Removes click-tracking parameters; returns the URL unchanged when there are none. */
+function cleanUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (!/^https?:$/.test(parsed.protocol) || !parsed.search) return url;
+  let changed = false;
+  for (const key of [...parsed.searchParams.keys()]) {
+    if (TRACKING_PARAMS.has(key) || TRACKING_PREFIXES.some((p) => key.toLowerCase().startsWith(p))) {
+      parsed.searchParams.delete(key);
+      changed = true;
+    }
+  }
+  return changed ? parsed.toString() : url;
+}
+
+// ---------------------------------------------------------------------------
+// Dangerous sites (phishing and malware)
+
+function checkThreat(details) {
+  if (!data.settings.get('dangerousSiteProtection')) return null;
+  let host;
+  try {
+    host = new URL(details.url).hostname;
+  } catch {
+    return null;
+  }
+  if (threatBypass.has(host)) return null;
+  return lists.threatFor(fromElectronDetails(details));
+}
+
+/** "Open anyway" from the warning page: trusts the host until Kitty quits. */
+function bypassThreat(url) {
+  try {
+    threatBypass.add(new URL(url).hostname);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Cosmetic filtering
 
 /**
@@ -100,7 +158,7 @@ function injectCosmetics(event, url, msg) {
   if (!frame) return;
   const { hostname, domain } = Request.fromRawDetails({ url });
   const isFirstRun = msg === undefined; // later calls carry DOM info (classes, ids, hrefs)
-  const { active, styles, scripts } = blocker.getCosmeticsFilters({
+  const { active, styles, scripts } = lists.adBlocker().getCosmeticsFilters({
     url,
     hostname,
     domain: domain || '',
@@ -250,9 +308,18 @@ function setupSession(ses) {
   ses.webRequest.onBeforeRequest((details, callback) => {
     const isFrame = details.resourceType === 'mainFrame' || details.resourceType === 'subFrame';
     if (isFrame) {
-      const upgraded = httpsUpgradeFor(details.url);
-      if (upgraded) return callback({ redirectURL: upgraded });
+      const threat = checkThreat(details);
+      if (threat) {
+        if (details.resourceType === 'mainFrame') {
+          registry.tabByWebContentsId(details.webContentsId)?.kwin.showThreatWarning(details.webContentsId, details.url, threat);
+        }
+        return callback({ cancel: true });
+      }
+      let target = httpsUpgradeFor(details.url) || details.url;
+      if (data.settings.get('stripTrackingParams') && isShieldUp(target)) target = cleanUrl(target);
+      if (target !== details.url) return callback({ redirectURL: target });
     }
+    const blocker = lists.adBlocker();
     if (!blocker || details.resourceType === 'mainFrame' || !details.webContentsId) return callback({});
 
     const found = registry.tabByWebContentsId(details.webContentsId);
@@ -306,11 +373,11 @@ function shieldsUpFor(details) {
 function registerPrivacyIpc() {
   ipcMain.handle('@ghostery/adblocker/inject-cosmetic-filters', (event, url, msg) => {
     const found = registry.tabByWebContentsId(event.sender.id);
-    if (!blocker || !found || !isShieldUp(found.tab.view.webContents.getURL())) return;
+    if (!lists.adBlocker() || !found || !isShieldUp(found.tab.view.webContents.getURL())) return;
     injectCosmetics(event, url, msg);
   });
   ipcMain.handle('@ghostery/adblocker/is-mutation-observer-enabled', (event) =>
-    blocker ? blocker.onIsMutationObserverEnabled(event) : false,
+    lists.adBlocker() ? lists.adBlocker().onIsMutationObserverEnabled(event) : false,
   );
 
   // Asked synchronously by preload-fingerprint.js before any page script runs.
@@ -323,19 +390,6 @@ function registerPrivacyIpc() {
     const seed = crypto.createHmac('sha256', key).update(siteOf(top) || 'none').digest().readUInt32LE(0);
     event.returnValue = { enabled, seed };
   });
-}
-
-async function loadBlocker() {
-  const cachePath = path.join(app.getPath('userData'), 'adblock-engine.bin');
-  try {
-    blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
-      path: cachePath,
-      read: fs.promises.readFile,
-      write: fs.promises.writeFile,
-    });
-  } catch (err) {
-    console.error('[kitty] Não foi possível carregar as listas de bloqueio:', err);
-  }
 }
 
 function permissionList() {
@@ -357,8 +411,9 @@ function removePermission(origin, permission) {
 module.exports = {
   setupSession,
   registerPrivacyIpc,
-  loadBlocker,
   httpFallbackFor,
+  cleanUrl,
+  bypassThreat,
   permissionList,
   removePermission,
 };

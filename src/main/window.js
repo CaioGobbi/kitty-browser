@@ -205,6 +205,9 @@ class KittyWindow {
     });
     view.setBackgroundColor('#00000000');
     const wc = view.webContents;
+    // WebRTC only uses the default route's public address: local network
+    // addresses (and the real IP behind a split VPN) aren't exposed to sites.
+    wc.setWebRTCIPHandlingPolicy('default_public_interface_only');
     const tab = {
       id: wc.id,
       view,
@@ -256,6 +259,7 @@ class KittyWindow {
       this.sendState();
     });
     wc.on('did-navigate', (_e, url) => {
+      if (url.startsWith('kitty://blocked')) tab.threatBlocked = false;
       if (url.startsWith('kitty://error')) this.dropFailedEntry(wc, url);
       this.recordHistory(wc);
       this.sendState();
@@ -277,6 +281,7 @@ class KittyWindow {
     wc.on('audio-state-changed', () => this.sendState());
     wc.on('did-fail-load', (_e, code, desc, failedUrl, isMainFrame) => {
       if (!isMainFrame || code === -3) return; // -3 = aborted (e.g. user hit stop)
+      if (code === -20 && tab.threatBlocked) return; // blocked on purpose: the warning page is on its way
       const fallback = code !== -105 ? httpFallbackFor(failedUrl) : null; // -105 = name not resolved
       if (fallback) return wc.loadURL(fallback).catch(() => {});
       const params = new URLSearchParams({ url: failedUrl, reason: desc });
@@ -460,6 +465,15 @@ class KittyWindow {
     const nav = wc.navigationHistory;
     const index = nav.getActiveIndex() - 1;
     if (index >= 0 && nav.getEntryAtIndex(index)?.url === failedUrl) nav.removeEntryAtIndex(index);
+  }
+
+  /** Replaces a navigation to a phishing/malware site with Kitty's warning page. */
+  showThreatWarning(webContentsId, url, kind) {
+    const tab = this.tabs.get(webContentsId);
+    if (!tab) return;
+    tab.threatBlocked = true;
+    const params = new URLSearchParams({ url, kind });
+    setImmediate(() => tab.view.webContents.loadURL(`kitty://blocked?${params}`).catch(() => {}));
   }
 
   // -------------------------------------------------------------------------

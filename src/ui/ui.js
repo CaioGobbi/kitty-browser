@@ -123,7 +123,9 @@ window.addEventListener('blur', () => {
 function displayUrl(tab) {
   if (!tab) return '';
   if (!tab.internal) return tab.url;
-  if (tab.url.startsWith('kitty://error')) return new URL(tab.url).searchParams.get('url') || '';
+  if (tab.url.startsWith('kitty://error') || tab.url.startsWith('kitty://blocked')) {
+    return new URL(tab.url).searchParams.get('url') || '';
+  }
   if (tab.url.startsWith('kitty://newtab')) return '';
   return tab.url.replace(/\/$/, '');
 }

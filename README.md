@@ -44,7 +44,13 @@ Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
 - **Janela privativa** (`⇧⌘N`): nada fica salvo, e tudo some ao fechar
 - **HTTPS automático**, com volta para HTTP só quando o site não suporta
 - **Cookies de terceiros bloqueados**
-- **Proteção contra fingerprinting**: ruído por site em canvas, WebGL, áudio e hardware, no estilo do Brave
+- **Proteção contra sites perigosos**: avisa antes de abrir phishing e malware (listas malware-filter, URLhaus e uBlock Origin), verificando tudo localmente
+- **Links sem rastreadores**: remove `utm_*`, `fbclid`, `gclid` e similares antes de abrir
+- **DNS seguro** (DNS over HTTPS) com Quad9, Cloudflare ou Mullvad
+- **User-Agent igual ao do Chrome**, sem revelar Electron nem Kitty
+- **Proteção contra fingerprinting**: ruído por site em canvas, WebGL, áudio, medição de fontes, tela, hardware e workers, no estilo do Brave
+- **WebRTC** não expõe endereços da rede local
+- Listas de bloqueio **atualizadas sozinhas** (anúncios a cada 24 h, ameaças a cada 6 h)
 - **Permissões de sites**: câmera, microfone, localização e notificações só com o seu OK
 - **Global Privacy Control** (`Sec-GPC` e `navigator.globalPrivacyControl`)
 - Vídeos com DRM via Widevine (Castlabs)
@@ -74,7 +80,8 @@ Para testar sem mexer no seu perfil: `KITTY_PROFILE=/tmp/kitty-teste npm start`.
 src/main/   processo principal
   main.js        inicialização, IPC, favoritos, sugestões, configurações
   window.js      uma janela: abas, layout, tela cheia, busca, permissões
-  privacy.js     escudos, HTTPS, cookies, permissões, fingerprinting
+  privacy.js     escudos, HTTPS, cookies, links, sites perigosos, permissões
+  lists.js       listas de bloqueio e de ameaças, com atualização automática
   downloads.js   gerenciador de downloads
   menus.js       menu do app e menus de botão direito
 src/ui/     barra de abas e barra de ferramentas

@@ -5,6 +5,7 @@ const { Menu, clipboard, dialog } = require('electron');
 const { data, engine, searchUrl } = require('./data');
 const { registry } = require('./registry');
 const downloads = require('./downloads');
+const { cleanUrl } = require('./privacy');
 
 /** Set by main.js so menus can open windows and toggle bookmarks. */
 const actions = {
@@ -170,6 +171,10 @@ function pageContextMenu(kwin, tab, params) {
       { label: 'Salvar link como…', click: () => downloads.saveAs(wc, params.linkURL) },
       { label: 'Copiar endereço do link', click: () => clipboard.writeText(params.linkURL) },
     );
+    const clean = cleanUrl(params.linkURL);
+    if (clean !== params.linkURL) {
+      items.push({ label: 'Copiar link sem rastreadores', click: () => clipboard.writeText(clean) });
+    }
   }
 
   if (params.mediaType === 'image' && params.srcURL) {
