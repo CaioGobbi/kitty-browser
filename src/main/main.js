@@ -11,6 +11,7 @@ const { registry } = require('./registry');
 const privacy = require('./privacy');
 const downloads = require('./downloads');
 const lists = require('./lists');
+const updater = require('./updater');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 
@@ -294,6 +295,7 @@ function settingsSnapshot() {
     isDefaultBrowser: isDefaultBrowser(),
     canBeDefault: app.isPackaged,
     platform: process.platform,
+    update: updater.snapshot(),
     downloadsDir: app.getPath('downloads'),
     version: app.getVersion(),
   };
@@ -341,7 +343,9 @@ function registerIpc() {
     w.sendUi('downloads:state', downloads.list());
     w.sendUi('settings:state', uiSettings());
     w.sendUi('ui:fullscreen', w.win.isFullScreen());
+    w.sendUi('update:state', updater.snapshot());
   });
+  ui('update:install', () => updater.install());
   ui('ui:chrome', (w, layout) => w.setChrome(layout || {}));
   ui('tab:new', (w) => w.createTab());
   ui('tab:close', (w, id) => w.closeTab(id ?? w.activeId));
@@ -455,6 +459,11 @@ function registerIpc() {
     await lists.refresh({ force: true });
     return settingsSnapshot();
   });
+  ipcMain.handle('kitty:settings-check-update', (event) => {
+    if (!fromPage(event, 'settings')) return null;
+    updater.check();
+    return settingsSnapshot();
+  });
   ipcMain.handle('kitty:threat-bypass', (event, url) => {
     if (!fromPage(event, 'blocked') || !/^https?:/.test(String(url))) return false;
     return privacy.bypassThreat(String(url));
@@ -559,6 +568,13 @@ app.whenReady().then(async () => {
   else new KittyWindow();
 
   ready = true;
+  updater.init({
+    onBeforeInstall: () => {
+      saveSessionNow();
+      quitting = true;
+      flushData();
+    },
+  });
   if (process.platform !== 'darwin') pendingUrls.push(...urlsFromArgv(process.argv));
   for (const url of pendingUrls.splice(0)) openExternalUrl(url);
 

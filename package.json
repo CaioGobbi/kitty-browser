@@ -1,7 +1,7 @@
 {
   "name": "kitty-browser",
   "productName": "Kitty",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Kitty — um navegador rápido e focado em privacidade",
   "author": {
     "name": "Kitty"
@@ -15,7 +15,8 @@
     "install-app": "npm run dist && rm -rf /Applications/Kitty.app && cp -R out/Kitty-darwin-arm64/Kitty.app /Applications/",
     "postinstall": "node node_modules/electron/install.js",
     "evs-signup": ".venv/bin/python -m castlabs_evs.account signup",
-    "dist:win": "electron-builder --win nsis --x64"
+    "dist:win": "electron-builder --win nsis --x64",
+    "release:win": "electron-builder --win nsis --x64 --publish always"
   },
   "license": "MPL-2.0",
   "devDependencies": {
@@ -24,7 +25,8 @@
     "electron-builder": "26.16.1"
   },
   "dependencies": {
-    "@ghostery/adblocker-electron": "2.18.2"
+    "@ghostery/adblocker-electron": "2.18.2",
+    "electron-updater": "6.8.9"
   },
   "build": {
     "appId": "app.kitty.browser",
@@ -69,6 +71,19 @@
       "language": "1046",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
-    }
-  }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "caiogobbi",
+        "repo": "kitty-browser",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/caiogobbi/kitty-browser.git"
+  },
+  "homepage": "https://github.com/caiogobbi/kitty-browser"
 }

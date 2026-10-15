@@ -120,6 +120,22 @@ function render(s) {
   );
 
   $('downloads-dir').textContent = s.downloadsDir;
+
+  const u = s.update;
+  $('current-version').textContent = u.version;
+  $('check-update').hidden = !u.supported || u.status === 'ready' || u.status === 'downloading';
+  $('update-status').textContent = !u.supported
+    ? s.platform === 'darwin'
+      ? 'No Mac, a atualização automática exige uma assinatura paga da Apple. Por enquanto, instale as versões novas manualmente.'
+      : 'Atualização automática disponível no app instalado.'
+    : {
+        idle: 'O Kitty procura atualizações sozinho, a cada poucas horas, em github.com/caiogobbi/kitty-browser.',
+        checking: 'Procurando atualizações…',
+        downloading: `Baixando a versão ${u.available}… ${u.progress}%`,
+        ready: `A versão ${u.available} está pronta. Use o botão “Atualizar” na barra de ferramentas para reiniciar.`,
+        latest: 'Você está usando a versão mais recente.',
+        error: `Não foi possível procurar atualizações (${u.error}).`,
+      }[u.status];
   $('version').textContent = s.version;
 }
 
@@ -138,6 +154,15 @@ $('update-lists').addEventListener('click', async (e) => {
   $('lists-status').textContent = 'Atualizando…';
   render(await settings.updateLists());
   e.target.disabled = false;
+});
+$('check-update').addEventListener('click', async () => {
+  render(await settings.checkUpdate());
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const s = await settings.get();
+    render(s);
+    if (!['checking', 'idle'].includes(s.update.status)) break;
+  }
 });
 $('open-downloads').addEventListener('click', () => settings.openDownloads());
 $('clear').addEventListener('click', async () => {

@@ -26,6 +26,7 @@ if (location.protocol === 'kitty:') {
       makeDefaultBrowser: invoke('kitty:settings-default-browser'),
       openDownloads: invoke('kitty:settings-open-downloads'),
       updateLists: invoke('kitty:settings-update-lists'),
+      checkUpdate: invoke('kitty:settings-check-update'),
     },
   });
 }

@@ -641,5 +641,12 @@ api.onFocusAddress(() => {
   address.select();
 });
 
+const updateBtn = $('update-btn');
+api.onUpdate((update) => {
+  updateBtn.hidden = update.status !== 'ready';
+  updateBtn.title = `Kitty ${update.available} foi baixado. Clique para reiniciar e atualizar — suas abas voltam abertas.`;
+});
+updateBtn.addEventListener('click', () => api.installUpdate());
+
 window.addEventListener('resize', renderTabs);
 api.ready();

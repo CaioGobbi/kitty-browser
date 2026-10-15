@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
   bookmarkMenu: send('bookmark:menu'),
   downloadAction: send('downloads:action'),
   clearDownloads: send('downloads:clear'),
+  installUpdate: send('update:install'),
   suggest: (text) => ipcRenderer.invoke('ui:suggest', text),
 
   onState: on('tabs:state'),
@@ -42,6 +43,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
   onDownloadStarted: on('downloads:started'),
   onToggleDownloads: on('downloads:toggle'),
   onSettings: on('settings:state'),
+  onUpdate: on('update:state'),
   onFullscreen: on('ui:fullscreen'),
   onFocusAddress: on('ui:focus-address'),
   onFindOpen: on('find:open'),
