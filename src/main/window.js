@@ -250,7 +250,10 @@ class KittyWindow {
       pendingTitle: title,
       pinned,
     };
-    const at = index ?? (this.activeId != null ? this.order.indexOf(this.activeId) + 1 : this.order.length);
+    // A blank new tab goes to the end of the strip; a link opened from a page
+    // goes right next to the tab it came from.
+    const besideActive = url !== NEW_TAB_URL && this.activeId != null;
+    const at = index ?? (besideActive ? this.order.indexOf(this.activeId) + 1 : this.order.length);
     this.order.splice(this.clampToGroup(at, pinned), 0, tab.id);
     this.tabs.set(tab.id, tab);
 
