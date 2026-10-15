@@ -34,20 +34,29 @@ if (location.protocol === 'kitty:') {
 // ---------------------------------------------------------------------------
 // Swipe back/forward: a two-finger horizontal swipe on the trackpad arrives as
 // horizontal wheel events. When the page itself can't scroll that way, Kitty
-// navigates — with an arrow at the edge that follows the fingers, like Safari.
+// shows an arrow at the edge that follows the fingers, like Safari, and
+// navigates when they let go.
 //
-// Wheel events don't say when the fingers leave the trackpad, and macOS keeps
-// sending "momentum" events for up to a second afterwards. Waiting for those
-// to end felt laggy, so the gesture commits as soon as it's clearly over: the
-// speed drops well below its peak (the fingers lifted and momentum is decaying)
-// or the events stop for a moment.
+// On macOS the main process reports when the fingers touch down and lift off
+// (gestures.js), so the arrow stays up for as long as they rest on the
+// trackpad and the page changes exactly on release. Elsewhere wheel events are
+// all there is: the gesture counts as released when its speed drops well below
+// the peak or the events stop for a moment.
 
 const SWIPE_DISTANCE = 140; // px of horizontal scrolling needed to navigate
-const RELEASE_SLOWDOWN = 0.75; // speed below 75% of the gesture's peak = released
-const RELEASE_PAUSE = 90; // ms without events = released
-const GESTURE_GAP = 280; // ms without events = a new gesture may start
+const RELEASE_SLOWDOWN = 0.75; // (no phases) speed below 75% of the peak = released
+const RELEASE_PAUSE = 90; // (no phases) ms without events = released
+const GESTURE_GAP = 280; // ms without events before a new gesture may start
+
+let nativePhases = false;
+try {
+  nativePhases = ipcRenderer.sendSync('gesture:native') === true;
+} catch {
+  // main process not ready: approximate detection
+}
 
 let swipe = null;
+let fingersDown = false; // only meaningful with native phases
 let releaseTimer = null;
 let gapTimer = null;
 let indicator = null;
@@ -110,37 +119,55 @@ function hideIndicator(committed) {
   setTimeout(() => el.remove(), 240);
 }
 
-function release() {
+/** The fingers let go: navigate if the swipe went far enough, otherwise just put the arrow away. */
+function release({ cancelled = false } = {}) {
   clearTimeout(releaseTimer);
   if (!swipe || swipe.done) return;
   swipe.done = true;
-  const committed = Math.abs(swipe.dx) >= SWIPE_DISTANCE;
+  const committed = !cancelled && Math.abs(swipe.dx) >= SWIPE_DISTANCE;
   hideIndicator(committed);
   if (committed) ipcRenderer.send('gesture:navigate', swipe.dx < 0 ? 'back' : 'forward');
 }
+
+ipcRenderer.on('gesture:phase', (_event, phase) => {
+  if (phase === 'began') {
+    fingersDown = true;
+    swipe = null; // a fresh gesture
+  } else {
+    fingersDown = false;
+    // Wheel events travel separately from this message: let the last few land.
+    setTimeout(() => release({ cancelled: phase === 'cancelled' }), 30);
+  }
+});
 
 window.addEventListener(
   'wheel',
   (e) => {
     if (e.ctrlKey || e.deltaMode !== 0) return; // pinch-zoom, or a mouse wheel in lines/pages
+    // With phases, only events while the fingers are down count: momentum
+    // (including what spills into the page we just navigated to) is ignored.
+    if (nativePhases && !fingersDown) return;
+
     clearTimeout(gapTimer);
     gapTimer = setTimeout(() => {
-      release();
-      swipe = null;
+      if (!nativePhases) release();
+      if (!nativePhases || swipe?.done) swipe = null;
     }, GESTURE_GAP);
+
     if (!swipe) {
       const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.5;
       // Not a horizontal swipe, or the page scrolls sideways itself: leave it alone.
       swipe = { dx: 0, peak: 0, done: !horizontal || canScrollHorizontally(e.target, e.deltaX) };
     }
-    if (swipe.done) return; // momentum after the release, or the page's own gesture
+    if (swipe.done) return;
 
     swipe.dx += e.deltaX;
-    const speed = Math.abs(e.deltaX);
-    swipe.peak = Math.max(swipe.peak, speed);
     // Natural scrolling: fingers moving right scroll left (negative deltaX) → back.
     showIndicator(swipe.dx < 0 ? 'back' : 'forward', Math.abs(swipe.dx) / SWIPE_DISTANCE);
+    if (nativePhases) return; // wait for the fingers to lift
 
+    const speed = Math.abs(e.deltaX);
+    swipe.peak = Math.max(swipe.peak, speed);
     if (Math.abs(swipe.dx) >= SWIPE_DISTANCE && swipe.peak > 4 && speed < swipe.peak * RELEASE_SLOWDOWN) {
       release();
       return;

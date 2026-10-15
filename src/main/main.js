@@ -12,6 +12,7 @@ const privacy = require('./privacy');
 const downloads = require('./downloads');
 const lists = require('./lists');
 const updater = require('./updater');
+const gestures = require('./gestures');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 
@@ -570,6 +571,7 @@ app.whenReady().then(async () => {
     },
   });
 
+  gestures.init();
   setupProfile(session.fromPartition('persist:kitty'), { isPrivate: false });
   privacy.registerPrivacyIpc();
   registerIpc();

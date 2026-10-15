@@ -5,7 +5,7 @@
 const path = require('node:path');
 const { BaseWindow, WebContentsView, nativeTheme, session } = require('electron');
 
-const { data, searchUrl, isInternal, isShieldUp, isBookmarked } = require('./data');
+const { data, searchUrl, isInternal, isShieldUp, isBookmarked, originOf } = require('./data');
 const { registry } = require('./registry');
 const { httpFallbackFor } = require('./privacy');
 
@@ -286,12 +286,14 @@ class KittyWindow {
     wc.on('did-start-navigation', (details) => {
       if (details.isMainFrame && !details.isSameDocument) {
         tab.blocked.clear();
-        tab.favicon = null;
         this.denyPrompts(tab);
       }
       this.sendState();
     });
     wc.on('did-navigate', (_e, url) => {
+      // Chromium only reports a favicon when it changes, so a reload keeps the
+      // old one; it's cleared only when the tab moves to another site.
+      if (originOf(url) !== tab.faviconOrigin) tab.favicon = null;
       if (url.startsWith('kitty://blocked')) tab.threatBlocked = false;
       if (url.startsWith('kitty://error')) this.dropFailedEntry(wc, url);
       this.recordHistory(wc);
@@ -307,6 +309,7 @@ class KittyWindow {
     });
     wc.on('page-favicon-updated', (_e, favicons) => {
       tab.favicon = favicons[0] || null;
+      tab.faviconOrigin = originOf(wc.getURL());
       this.sendState();
     });
     wc.on('did-start-loading', () => this.sendState());
