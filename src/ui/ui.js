@@ -296,30 +296,47 @@ function createTabNode(id) {
 }
 
 // Drag to reorder: the tab follows the pointer, siblings swap as it passes
-// their middle, and the final position is sent to the main process.
+// their middle, and the final position is sent to the main process. A tab
+// stays inside its own group (pinned or not), so it never slides over the
+// window controls and lands exactly where it is dropped.
 let dragging = null;
 function startTabDrag(down, node, id) {
   const grab = down.clientX - node.getBoundingClientRect().left;
+  const pinned = node.classList.contains('pinned');
+  const group = () => liveTabs().filter((n) => n.classList.contains('pinned') === pinned);
   let started = false;
+  let minLeft = 0;
+  let maxLeft = 0;
   const onMove = (e) => {
     if (!started) {
       if (Math.abs(e.clientX - down.clientX) < 5) return;
       started = true;
       dragging = id;
       node.classList.add('dragging');
+      node.setPointerCapture?.(down.pointerId);
+      // The group's span doesn't change while its tabs are reordered.
+      const nodes = group();
+      minLeft = nodes[0].getBoundingClientRect().left;
+      maxLeft = nodes.at(-1).getBoundingClientRect().right - node.offsetWidth;
     }
-    const left = e.clientX - grab;
+    const left = Math.min(Math.max(e.clientX - grab, minLeft), Math.max(minLeft, maxLeft));
     const center = left + node.offsetWidth / 2;
     // Siblings glide out of the way instead of jumping.
     animateLayout(
       () => {
-        for (const sibling of liveTabs()) {
+        for (const sibling of group()) {
           if (sibling === node) continue;
           const r = sibling.getBoundingClientRect();
           const mid = r.left + r.width / 2;
           const isAfterNode = node.compareDocumentPosition(sibling) & Node.DOCUMENT_POSITION_FOLLOWING;
-          if (isAfterNode && center > mid) tabsEl.insertBefore(sibling, node);
-          else if (!isAfterNode && center < mid) tabsEl.insertBefore(node, sibling);
+          // Inclusive, so pushing against either end of the group still
+          // reaches the first or last slot.
+          if (isAfterNode && center >= mid) tabsEl.insertBefore(sibling, node);
+          else if (!isAfterNode && center <= mid) tabsEl.insertBefore(node, sibling);
+        }
+        if (pinned) {
+          const last = group().at(-1);
+          for (const n of group()) n.classList.toggle('last-pinned', n === last);
         }
       },
       { except: node },
@@ -330,6 +347,7 @@ function startTabDrag(down, node, id) {
   const onUp = () => {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
     if (!started) return;
     node.classList.remove('dragging');
     const offset = node.style.transform;
@@ -341,6 +359,7 @@ function startTabDrag(down, node, id) {
   };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
 }
 
 // ---------------------------------------------------------------------------
