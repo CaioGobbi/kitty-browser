@@ -48,11 +48,13 @@ window.kitty.stats().then((stats) => {
       img.src = site.favicon;
       // Broken icon: keep the letter.
       img.addEventListener('error', () => {
-        img.remove();
         letter.classList.remove('has-icon');
+        letter.textContent = site.host.charAt(0) || '?';
       });
+      // The icon replaces the letter: both in the box would stack and push the
+      // icon off center.
       letter.classList.add('has-icon');
-      letter.append(img);
+      letter.replaceChildren(img);
     }
     const name = document.createElement('span');
     name.textContent = site.host;

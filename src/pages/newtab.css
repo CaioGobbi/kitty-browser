@@ -64,7 +64,7 @@ main {
   text-transform: uppercase;
 }
 .site .letter.has-icon { font-size: 0; background: var(--surface-hover); }
-.site .letter img { width: 22px; height: 22px; object-fit: contain; }
+.site .letter img { display: block; width: 22px; height: 22px; object-fit: contain; }
 .site span:last-child {
   max-width: 100%;
   overflow: hidden;
