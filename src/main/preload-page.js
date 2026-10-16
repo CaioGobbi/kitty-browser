@@ -184,7 +184,7 @@ function release({ cancelled = false } = {}) {
   clearTimeout(releaseTimer);
   if (!swipe || swipe.done) return;
   swipe.done = true;
-  const committed = !cancelled && Math.abs(swipe.dx) >= SWIPE_DISTANCE;
+  const committed = !cancelled && !swipe.consumed && Math.abs(swipe.dx) >= SWIPE_DISTANCE;
   hideIndicator(committed);
   if (committed) ipcRenderer.send('gesture:navigate', swipe.dx < 0 ? 'back' : 'forward');
 }
@@ -220,10 +220,25 @@ window.addEventListener(
       swipe = { dx: 0, peak: 0, done: !horizontal || canScrollHorizontally(e.target, e.deltaX) };
     }
     if (swipe.done) return;
+    // Like Chrome, the swipe only gets what the page leaves: if a page script
+    // takes the wheel itself (spreadsheets, maps, canvas editors), the
+    // fingers scroll the content and the swipe is dropped. This listener runs
+    // before the page's, so look on the next frame, after the page has
+    // handled the event and any scrolling it caused has been reported.
+    const current = swipe;
+    requestAnimationFrame(() => {
+      if (current.done) return;
+      if (e.defaultPrevented || current.consumed) {
+        current.done = true;
+        clearTimeout(releaseTimer);
+        hideIndicator(false);
+        return;
+      }
+      // Natural scrolling: fingers moving right scroll left (negative deltaX) → back.
+      showIndicator(current.dx < 0 ? 'back' : 'forward', Math.abs(current.dx) / SWIPE_DISTANCE);
+    });
 
     swipe.dx += e.deltaX;
-    // Natural scrolling: fingers moving right scroll left (negative deltaX) → back.
-    showIndicator(swipe.dx < 0 ? 'back' : 'forward', Math.abs(swipe.dx) / SWIPE_DISTANCE);
     if (nativePhases) return; // wait for the fingers to lift
 
     const speed = Math.abs(e.deltaX);
@@ -234,6 +249,22 @@ window.addEventListener(
     }
     clearTimeout(releaseTimer);
     releaseTimer = setTimeout(release, RELEASE_PAUSE);
+  },
+  { passive: true, capture: true },
+);
+
+// Pages like Google Sheets scroll sideways with their own code, moving an
+// element that isn't under the pointer (so canScrollHorizontally can't see
+// it). Any sideways scroll during a swipe means the page took the gesture.
+const lastScrollLeft = new WeakMap();
+window.addEventListener(
+  'scroll',
+  (e) => {
+    const el = e.target === document ? document.scrollingElement : e.target;
+    if (!(el instanceof Element)) return;
+    const before = lastScrollLeft.get(el) ?? 0;
+    lastScrollLeft.set(el, el.scrollLeft);
+    if (el.scrollLeft !== before && swipe && !swipe.done) swipe.consumed = true;
   },
   { passive: true, capture: true },
 );
