@@ -14,7 +14,6 @@ const siteIcon = $('site-icon');
 const reloadBtn = $('reload');
 const starBtn = $('star');
 const shieldBtn = $('shield');
-const darkBtn = $('dark-btn');
 const shieldCount = $('shield-count');
 const bookmarksBar = $('bookmarks-bar');
 const permBar = $('perm-bar');
@@ -547,13 +546,6 @@ function renderToolbar() {
   starBtn.classList.toggle('on', !!tab?.bookmarked);
   starBtn.title = keys(tab?.bookmarked ? 'Remover dos favoritos (⌘D)' : 'Adicionar aos favoritos (⌘D)');
 
-  const darkable = tab?.darkPages === true || tab?.darkPages === false;
-  darkBtn.hidden = !darkable;
-  darkBtn.classList.toggle('on', !!tab?.darkPages);
-  darkBtn.title = tab?.darkPages
-    ? 'Modo escuro ligado neste site. Clique para ver o site como ele é.'
-    : 'Modo escuro desligado neste site. Clique para ligar.';
-
   const shieldable = tab && !tab.internal;
   shieldBtn.disabled = !shieldable;
   shieldBtn.classList.toggle('down', !!shieldable && !tab.shieldUp);
@@ -615,7 +607,6 @@ $('forward').addEventListener('click', () => api.forward());
 reloadBtn.addEventListener('click', () => (reloadBtn.classList.contains('loading') ? api.stop() : api.reload()));
 starBtn.addEventListener('click', () => api.toggleBookmark());
 shieldBtn.addEventListener('click', () => api.toggleShield());
-darkBtn.addEventListener('click', () => api.toggleDarkPages());
 // Double click on empty space in the tab strip (or the side column) opens a tab.
 for (const strip of [tabstrip, sidebar]) {
   strip.addEventListener('dblclick', (e) => {

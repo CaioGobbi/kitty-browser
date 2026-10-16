@@ -8,7 +8,6 @@ const { BaseWindow, WebContentsView, nativeTheme, session } = require('electron'
 const { data, searchUrl, isInternal, isShieldUp, isBookmarked, originOf } = require('./data');
 const { registry } = require('./registry');
 const { httpFallbackFor } = require('./privacy');
-const darkmode = require('./darkmode');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
 const NEW_TAB_URL = 'kitty://newtab';
@@ -183,7 +182,6 @@ class KittyWindow {
       canGoForward: wc.navigationHistory.canGoForward(),
       blocked: tab.blocked.size,
       shieldUp: internal ? true : isShieldUp(url),
-      darkPages: darkmode.isDark(url, this.isPrivate),
       internal,
       audible: !tab.pendingUrl && wc.isCurrentlyAudible(),
       muted: wc.isAudioMuted(),

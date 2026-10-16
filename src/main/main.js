@@ -4,12 +4,11 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
-const { app, components, ipcMain, net, protocol, session, shell } = require('electron');
+const { app, components, ipcMain, nativeTheme, net, protocol, session, shell } = require('electron');
 
 const { data, initData, flushData, allowed, engine, hostOf, isInternal, SEARCH_ENGINES, DNS_PROVIDERS, EDITABLE_SETTINGS } = require('./data');
 const { registry } = require('./registry');
 const privacy = require('./privacy');
-const darkmode = require('./darkmode');
 const downloads = require('./downloads');
 const lists = require('./lists');
 const updater = require('./updater');
@@ -98,6 +97,12 @@ function cleanUserAgent(ua) {
  * Encrypted DNS: falls back to the system resolver only if the provider can't
  * be reached. Chromium probes the provider at startup, so it waits for kitty://setup.
  */
+/** The Kitty theme (interface and kitty:// pages); websites get it as prefers-color-scheme, as in Chrome. */
+function applyTheme() {
+  const theme = data.settings.get('theme');
+  nativeTheme.themeSource = ['dark', 'light', 'system'].includes(theme) ? theme : 'dark';
+}
+
 function applyDns() {
   const provider = data.settings.get('setupDone') && DNS_PROVIDERS[data.settings.get('secureDns')];
   app.configureHostResolver({
@@ -439,12 +444,6 @@ function registerIpc() {
     data.settings.set('allowlist', allowlist.includes(host) ? allowlist.filter((h) => h !== host) : [...allowlist, host]);
     wc.reload();
   });
-  ui('darkpages:toggle', (w) => {
-    const tab = w.activeTab();
-    if (!tab) return;
-    darkmode.toggleSite(tab);
-    for (const win of registry.windows) win.sendState();
-  });
   ui('open:internal', (_w, page) => {
     if (['history', 'bookmarks', 'settings', 'passwords', 'extensions'].includes(page)) openInternal(`kitty://${page}`);
   });
@@ -548,11 +547,7 @@ function registerIpc() {
     if (!fromPage(event, 'settings') || !EDITABLE_SETTINGS[key]?.(value)) return settingsSnapshot();
     data.settings.set(key, value);
     if (key === 'secureDns') applyDns();
-    if (key === 'theme') darkmode.applyTheme();
-    if (key === 'darkPages') {
-      darkmode.refresh();
-      for (const w of registry.windows) w.sendState();
-    }
+    if (key === 'theme') applyTheme();
     if (['tabLayout', 'bookmarksBar'].includes(key)) menus.buildAppMenu();
     if (key === 'autoUpdateLists' && value) lists.refresh();
     if (key === 'widevine') setupWidevine(allowed('widevine'));
@@ -683,7 +678,7 @@ app.whenReady().then(async () => {
   downloads.loadLog();
   app.userAgentFallback = cleanUserAgent(app.userAgentFallback);
   applyDns();
-  darkmode.applyTheme();
+  applyTheme();
 
   if (process.platform === 'darwin' && !app.isPackaged) {
     app.dock.setIcon(path.join(__dirname, '..', '..', 'assets', 'icon.png'));
@@ -699,7 +694,6 @@ app.whenReady().then(async () => {
   hooks.favicon = rememberFavicon;
   hooks.tabCreated = (kwin, tab) => {
     passwords.watchTab(kwin, tab);
-    darkmode.watchTab(tab);
     extensions.watchNavigation(tab.view.webContents);
   };
   hooks.passwordOffer = passwords.offerFor;
