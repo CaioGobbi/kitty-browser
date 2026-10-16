@@ -42,6 +42,9 @@ const SETTING_DEFAULTS = {
   bookmarksBar: 'newtab', // 'always', 'newtab' (only on the new tab page) or 'never'
   tabLayout: 'classic', // 'classic' (tabs above the toolbar), 'compact' (one row) or 'vertical' (tabs on the side)
   verticalTabsCollapsed: false,
+  theme: 'dark', // interface and kitty:// pages: 'dark', 'light' or 'system'
+  darkPages: 'dark', // websites: 'dark' (own dark mode, or forced) or 'site' (follow the theme)
+  darkSites: {}, // { [host]: true | false } dark pages switched on/off with the moon button
   restoreSession: true,
   httpsUpgrade: true,
   blockThirdPartyCookies: true,
@@ -82,6 +85,8 @@ const EDITABLE_SETTINGS = {
   bookmarksBar: (v) => BOOKMARKS_BAR.includes(v),
   tabLayout: (v) => TAB_LAYOUTS.includes(v),
   verticalTabsCollapsed: (v) => typeof v === 'boolean',
+  theme: (v) => ['dark', 'light', 'system'].includes(v),
+  darkPages: (v) => ['dark', 'site'].includes(v),
   restoreSession: (v) => typeof v === 'boolean',
   httpsUpgrade: (v) => typeof v === 'boolean',
   blockThirdPartyCookies: (v) => typeof v === 'boolean',

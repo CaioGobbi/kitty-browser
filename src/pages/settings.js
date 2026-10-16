@@ -78,6 +78,8 @@ function render(s) {
   );
   dns.value = s.values.secureDns;
   $('tab-layout').value = s.values.tabLayout;
+  $('theme').value = s.values.theme;
+  $('dark-pages').value = s.values.darkPages;
   $('bookmarks-bar').value = s.values.bookmarksBar;
 
   const ago = (t) => {
@@ -155,6 +157,8 @@ $('make-default').addEventListener('click', async () => {
 });
 $('dns').addEventListener('change', async (e) => render(await settings.set('secureDns', e.target.value)));
 $('bookmarks-bar').addEventListener('change', async (e) => render(await settings.set('bookmarksBar', e.target.value)));
+$('theme').addEventListener('change', async (e) => render(await settings.set('theme', e.target.value)));
+$('dark-pages').addEventListener('change', async (e) => render(await settings.set('darkPages', e.target.value)));
 $('tab-layout').addEventListener('change', async (e) => render(await settings.set('tabLayout', e.target.value)));
 $('update-lists').addEventListener('click', async (e) => {
   e.target.disabled = true;

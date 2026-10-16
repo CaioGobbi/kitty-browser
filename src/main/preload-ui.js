@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
   reload: send('nav:reload'),
   stop: send('nav:stop'),
   toggleShield: send('shield:toggle'),
+  toggleDarkPages: send('darkpages:toggle'),
   openInternal: send('open:internal'),
   newPrivateWindow: send('window:private'),
   newWindow: send('window:new'),

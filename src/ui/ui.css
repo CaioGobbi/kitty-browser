@@ -487,6 +487,13 @@ body.private #private-badge {
   fill: var(--accent);
 }
 
+#dark-btn.on {
+  color: var(--accent);
+}
+#dark-btn.on svg {
+  fill: var(--accent);
+}
+
 .shield {
   display: flex;
   align-items: center;

@@ -8,6 +8,7 @@ const { BaseWindow, WebContentsView, nativeTheme, session } = require('electron'
 const { data, searchUrl, isInternal, isShieldUp, isBookmarked, originOf } = require('./data');
 const { registry } = require('./registry');
 const { httpFallbackFor } = require('./privacy');
+const darkmode = require('./darkmode');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
 const NEW_TAB_URL = 'kitty://newtab';
@@ -87,7 +88,7 @@ class KittyWindow {
       minWidth: 480,
       minHeight: 320,
       title: isPrivate ? 'Kitty — Janela privativa' : 'Kitty',
-      backgroundColor: isPrivate ? '#1a1326' : '#17151c',
+      backgroundColor: isPrivate ? '#1a1326' : nativeTheme.shouldUseDarkColors ? '#17151c' : '#f6f4f9',
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
       trafficLightPosition: { x: 14, y: 13 },
       titleBarOverlay: process.platform === 'darwin' ? false : titleBarOverlay(isPrivate),
@@ -182,6 +183,7 @@ class KittyWindow {
       canGoForward: wc.navigationHistory.canGoForward(),
       blocked: tab.blocked.size,
       shieldUp: internal ? true : isShieldUp(url),
+      darkPages: darkmode.isDark(url, this.isPrivate),
       internal,
       audible: !tab.pendingUrl && wc.isCurrentlyAudible(),
       muted: wc.isAudioMuted(),
@@ -327,6 +329,10 @@ class KittyWindow {
 
     wc.on('did-start-navigation', (details) => {
       if (details.isMainFrame && !details.isSameDocument) {
+        // kitty:// pages paint their own background; websites without one
+        // expect white, as in any browser (a transparent view showed the dark
+        // window behind them, with dark text on top).
+        tab.view.setBackgroundColor(isInternal(details.url) ? '#00000000' : '#ffffff');
         tab.blocked.clear();
         tab.owner.denyPrompts(tab);
       }
