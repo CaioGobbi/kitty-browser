@@ -16,6 +16,16 @@ else
   echo "   Crie com: .venv/bin/python -m castlabs_evs.account signup"
 fi
 
+# Where the app looks for updates (electron-updater; electron-builder writes the
+# same file for Windows). Inside the bundle, so it goes before the signature.
+cat > "$PKG/Kitty.app/Contents/Resources/app-update.yml" <<'YML'
+owner: CaioGobbi
+repo: kitty-browser
+provider: github
+releaseType: release
+updaterCacheDirName: kitty-browser-updater
+YML
+
 # A fixed identity keeps macOS permissions (Full Disk Access) across versions: an
 # ad-hoc signature changes with every build and macOS forgets them. Uses the
 # self-signed "Kitty Local" certificate when this Mac has it, ad-hoc otherwise.

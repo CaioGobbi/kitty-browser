@@ -29,8 +29,14 @@ O Kitty é construído sobre o Chromium (via Electron), na mesma linha do Brave.
 As versões ficam no [GitHub Releases](https://github.com/CaioGobbi/kitty-browser/releases/latest):
 
 - **Windows 10/11 (64 bits):** `Kitty-Setup-*.exe`. O Kitty se atualiza sozinho depois de instalado.
-- **macOS (Apple Silicon, M1 ou mais novo):** `Kitty-*-mac-arm64.dmg`. Abra e arraste o Kitty para a pasta Aplicativos. No Mac ele ainda não se atualiza sozinho: para atualizar, baixe o DMG da versão nova.
-- **Linux:** ainda não é suportado.
+- **macOS (Apple Silicon, M1 ou mais novo):** `Kitty-*-mac-arm64.dmg`. Abra e arraste o Kitty para a pasta Aplicativos. A partir da 0.3.3 ele se atualiza sozinho; quem tem uma versão anterior precisa baixar o DMG da versão nova uma vez.
+- **Linux (64 bits):** instale com uma linha no terminal, que baixa a versão mais nova (rode de novo para atualizar):
+
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/CaioGobbi/kitty-browser/main/install.sh | sh
+  ```
+
+  No Debian, Ubuntu e derivados ele instala o `.deb`; no Fedora e no openSUSE, o `.rpm`; nas outras distribuições, o `.AppImage` em `~/.local/bin` (precisa da biblioteca FUSE 2). Os três arquivos também ficam no Releases, para instalar à mão. O comando é `kitty-browser`, para não confundir com o terminal kitty.
 
 > [!WARNING]
 > O Kitty ainda não tem assinatura digital da Microsoft nem da Apple, então o sistema avisa na primeira vez.
@@ -120,6 +126,14 @@ npm run dist:win
 
 Gera `out/windows/Kitty-Setup-<versão>.exe` (Windows 10/11, 64 bits); dá para gerar direto do Mac.
 
+### Gerar os pacotes para Linux
+
+```bash
+npm run dist:linux
+```
+
+Gera em `out/linux/` o `.AppImage` e o `.deb` (x64); dá para gerar direto do Mac. O `.rpm` precisa do `rpmbuild`, então o `npm run release:linux` o gera num container Docker.
+
 ### Crunchyroll, Netflix e outros com DRM
 
 Esses serviços só liberam a licença do vídeo (Widevine) para apps com assinatura **VMP**, que a Castlabs emite de graça pelo serviço EVS. As versões publicadas do Kitty já vêm assinadas. Sem a assinatura o Kitty funciona normalmente, só esses vídeos não tocam. Para assinar os seus próprios builds, crie uma conta EVS uma vez:
@@ -134,7 +148,7 @@ Depois disso, `npm run dist` (Mac) e `npm run dist:win` (Windows) assinam sozinh
 
 ### Publicar uma versão (mantenedores)
 
-Suba a versão no `package.json`, faça o commit e rode `npm run release:win` (precisa do `gh auth login`). O script gera o instalador e cria a versão no GitHub Releases, de onde os Kitty instalados no Windows se atualizam sozinhos. Depois rode `npm run release:mac`, que gera o DMG para Mac e anexa na mesma versão (o código precisa estar sem alterações pendentes).
+Suba a versão no `package.json`, faça o commit e rode `npm run release:win` (precisa do `gh auth login`). O script gera o instalador e cria a versão no GitHub Releases, de onde os Kitty instalados no Windows se atualizam sozinhos. Depois rode `npm run release:mac`, que gera o DMG e a atualização do Mac e anexa na mesma versão, e `npm run release:linux`, que faz o mesmo com os pacotes do Linux (o código precisa estar sem alterações pendentes).
 
 ## Estrutura
 
@@ -145,7 +159,7 @@ src/main/   processo principal
   privacy.js     escudos, HTTPS, cookies, links, sites perigosos, permissões
   lists.js       listas de bloqueio e de ameaças, com atualização automática
   importer.js    importação de outros navegadores
-  updater.js     atualização automática (Windows)
+  updater.js     atualização automática (Windows e Mac)
   downloads.js   gerenciador de downloads
   menus.js       menu do app e menus de botão direito
   preload-*.js   proteções que rodam dentro das páginas (fingerprinting, scriptlets)
@@ -156,7 +170,7 @@ assets/     ícone do app e arquivos do instalador
 scripts/    geração do ícone, assinatura e publicação
 ```
 
-Dados do usuário ficam em `~/Library/Application Support/Kitty` no Mac e em `%APPDATA%\Kitty` no Windows.
+Dados do usuário ficam em `~/Library/Application Support/Kitty` no Mac, em `%APPDATA%\Kitty` no Windows e em `~/.config/Kitty` no Linux.
 
 ## Contribuir
 

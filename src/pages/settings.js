@@ -135,7 +135,9 @@ function render(s) {
   $('check-update').hidden = !u.supported || u.status === 'ready' || u.status === 'downloading';
   $('auto-update-row').hidden = !u.supported;
   $('update-status').textContent = !u.supported
-    ? t('Atualização automática disponível no app instalado.')
+    ? s.platform === 'linux'
+      ? t('No Linux, o Kitty se atualiza rodando de novo o comando de instalação do README.')
+      : t('Atualização automática disponível no app instalado.')
     : {
         idle: s.values.autoUpdate
           ? t('O Kitty procura atualizações sozinho, a cada poucas horas, em github.com/caiogobbi/kitty-browser.')

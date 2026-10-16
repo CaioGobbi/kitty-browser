@@ -1,9 +1,11 @@
 'use strict';
 
-// Automatic updates on Windows, from the GitHub Releases of
+// Automatic updates on Windows and macOS, from the GitHub Releases of
 // caiogobbi/kitty-browser (configured in package.json → build.publish).
 // New versions download in the background and install when Kitty restarts.
-// macOS needs a paid Apple Developer ID signature for this, so it's off there.
+// On macOS Squirrel.Mac only accepts an update signed with the same identity
+// as the running app (the self-signed "Kitty Local" certificate, see
+// scripts/sign-mac.sh), so no Apple Developer ID is needed.
 const { app } = require('electron');
 
 const { registry } = require('./registry');
@@ -11,7 +13,7 @@ const { registry } = require('./registry');
 const CHECK_EVERY = 4 * 3_600_000;
 
 const state = {
-  supported: process.platform === 'win32' && app.isPackaged,
+  supported: ['win32', 'darwin'].includes(process.platform) && app.isPackaged,
   status: 'idle', // idle | checking | downloading | ready | latest | error
   version: app.getVersion(),
   available: null, // version being downloaded / ready to install
@@ -44,6 +46,10 @@ function init({ onBeforeInstall, canCheck } = {}) {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowPrerelease = false;
   autoUpdater.logger = null;
+  if (process.env.KITTY_UPDATE_FEED) {
+    // Testing only: a local folder served over HTTP with latest(-mac).yml.
+    autoUpdater.setFeedURL({ provider: 'generic', url: process.env.KITTY_UPDATE_FEED });
+  }
 
   autoUpdater.on('checking-for-update', () => set({ status: 'checking', error: null }));
   autoUpdater.on('update-available', (info) => set({ status: 'downloading', available: info.version, progress: 0 }));

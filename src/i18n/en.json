@@ -261,6 +261,7 @@
   "O Kitty agora pergunta antes": "Kitty now asks first",
   "Nesta versão, nada se conecta sozinho sem a sua escolha. Suas escolhas atuais já vêm marcadas: é só conferir.": "In this version, nothing connects by itself without your choice. Your current choices are already selected: just check them.",
   "A atualização automática do Kitty funciona só no app instalado.": "Kitty's automatic updates only work in the installed app.",
+  "No Linux, o Kitty se atualiza rodando de novo o comando de instalação do README.": "On Linux, update Kitty by running the install command from the README again.",
   "Copia favoritos e histórico salvos neste computador. Nada é enviado pela internet. Se não quiser, é só seguir.": "Copies bookmarks and history saved on this computer. Nothing is sent over the internet. If you'd rather not, just continue.",
   "Nenhum outro navegador encontrado neste computador. Dá para importar depois, em Configurações.": "No other browser found on this computer. You can import later, in Settings.",
   "O macOS não deixa o Kitty ler os dados do {browser}. Para liberar, ative o Kitty em {path} e volte para esta tela.": "macOS doesn't let Kitty read {browser}'s data. To allow it, turn on Kitty in {path} and come back to this screen.",

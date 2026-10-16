@@ -8,9 +8,9 @@ O Kitty é um navegador focado em privacidade, no estilo do Brave, feito em Elec
 
 | Plataforma | Situação |
 | --- | --- |
-| macOS (Apple Silicon) | Gerado e instalado localmente em `/Applications/Kitty.app`. DMG sem assinatura da Apple em cada release (desde a 0.2.4); sem atualização automática (falta Developer ID da Apple) |
+| macOS (Apple Silicon) | Gerado e instalado localmente em `/Applications/Kitty.app`. DMG sem assinatura da Apple em cada release (desde a 0.2.4) e atualização automática a partir da 0.3.3 (`.zip` + `latest-mac.yml`, validada pela assinatura "Kitty Local") |
 | Windows 10/11 x64 | Instalador NSIS publicado no GitHub Releases, com atualização automática |
-| Linux | Não suportado ainda; ver "O que falta" |
+| Linux x64 | `.AppImage`, `.deb` e `.rpm` (electron-builder), a partir da 0.3.3, e `install.sh` na raiz para instalar com `curl … \| sh`. Testado só em containers Docker (Debian, Ubuntu, Fedora, Arch); sem atualização automática |
 
 **Versão atual: 0.3.2** (publicada no Windows e no Mac em 16/10/2026). Histórico: 0.2.0 primeira pública · 0.2.1 teste da atualização automática · 0.2.2 assinatura VMP (Crunchyroll) · 0.2.3 abas fixadas, gestos do trackpad e correções do YouTube · 0.2.4 importação de outros navegadores e ícones no acesso rápido · 0.3.0 favoritos editáveis, gerenciador de senhas e assinatura "Kitty Local" no Mac · 0.3.1 boas-vindas com consentimento, menu do site, layouts das abas, aba para outra janela, extensões do Chrome, barra de favoritos em três modos e Configurações em seções · 0.3.2 tema claro/escuro do Kitty, listas oficiais do uBlock e correção do pulador de anúncios do YouTube.
 
@@ -26,7 +26,8 @@ O Kitty é um navegador focado em privacidade, no estilo do Brave, feito em Elec
   - `passwords.js`: senhas salvas (`passwords.json`, cada senha criptografada pelo sistema via `safeStorage`), a barra "Salvar a senha?" e a página de senhas. A detecção do login e o preenchimento ficam em `preload-page.js`.
   - `extensions.js` (instalar pela Chrome Web Store, ligar/desligar, fixar, `kitty://extensions`), `extension-api.js` (as APIs `chrome.*` que o Electron não tem, o pop-up e os eventos de abas/janelas) e `preload-extensions.js` (coloca essas APIs em cada contexto de extensão).
   - `siteinfo.js`: painel de informações do site (botão à esquerda do endereço) e a página `kitty://site`: guarda o certificado de cada host (`setCertificateVerifyProc`, sem mudar a verificação do Chromium), conta e apaga cookies e dados do site, e liga/desliga o fingerprinting por site (`fingerprintOff` nas configurações).
-  - `lists.js` (listas de bloqueio: as mesmas que o uBlock Origin liga por padrão, baixadas dos sites oficiais, com a cópia do Ghostery só como reserva; a cópia que vem no app em `src/lists/`, gerada no build e fora do git, e as atualizações, só com permissão), `downloads.js`, `menus.js` (menus e atalhos), `updater.js` (atualização no Windows), `gestures.js` (gestos), `data.js`, `store.js`, `registry.js`.
+  - `updater.js`: atualização automática (electron-updater) no Windows e no Mac. No Mac usa o Squirrel.Mac do Electron, que só aceita uma versão assinada com o mesmo certificado do app instalado; `scripts/sign-mac.sh` põe o `app-update.yml` dentro do app. `KITTY_UPDATE_FEED=<url>` aponta para uma pasta local com `latest-mac.yml` (só para teste).
+  - `lists.js` (listas de bloqueio: as mesmas que o uBlock Origin liga por padrão, baixadas dos sites oficiais, com a cópia do Ghostery só como reserva; a cópia que vem no app em `src/lists/`, gerada no build e fora do git, e as atualizações, só com permissão), `downloads.js`, `menus.js` (menus e atalhos), `gestures.js` (gestos), `data.js`, `store.js`, `registry.js`.
   - Preloads: `preload-ui.js` (interface), `preload-page.js` (páginas `kitty://` e gestos), `preload-fingerprint.js`, `preload-scriptlets.js` (inclui o pulador de anúncios do YouTube).
 - `src/i18n/` — idiomas da interface: `index.js` (`t()`, lista `LANGUAGES`) e um JSON por idioma (`en.json`), que traduz o texto em português do código. Ver "Idiomas" em Recursos.
 - `src/ui/` — barra de abas, endereço e painéis (a vista de cima de cada janela). O painel do site fica em `siteinfo.js`/`siteinfo.css`; os layouts das abas, em `layouts.css` (as mesmas peças mudam de lugar em `applyLayout`, no `ui.js`).
@@ -70,7 +71,9 @@ Dados do usuário no Mac: `~/Library/Application Support/Kitty` (`settings.json`
 | `npm run install-app` | `dist` e copia para `/Applications` |
 | `npm run dist:win` | Gera `out/windows/Kitty-Setup-<versão>.exe` |
 | `npm run release:win` | Build do Windows, push e release no GitHub (ver abaixo) |
-| `npm run release:mac` | DMG do Mac anexado ao release da versão atual (rodar depois do `release:win`) |
+| `npm run release:mac` | DMG, `.zip` e `latest-mac.yml` do Mac anexados ao release da versão atual (rodar depois do `release:win`) |
+| `npm run dist:linux` | Gera `.AppImage` e `.deb` x64 em `out/linux/` (direto do Mac) |
+| `npm run release:linux` | Pacotes do Linux (e o `.rpm`, num container Docker) anexados ao release da versão atual |
 | `npm run icon` | Regera os ícones a partir de `assets/icon.svg` |
 | `npm run lists` | Baixa as listas de bloqueio para `src/lists/` (vão dentro do app; roda sozinho antes de cada build) |
 
@@ -81,12 +84,13 @@ Para testar sem mexer no perfil real: `KITTY_PROFILE=<pasta> npx electron . --in
 1. Cada release chega a todos os Kitty instalados no Windows, então só publique o que já foi testado.
 2. Subir `version` no `package.json` e commitar ("Versão X.Y.Z: …").
 3. `npm run release:win` (precisa de `gh auth login`). O script gera o instalador, dá push, cria o release `vX.Y.Z` e envia `.exe`, `.blockmap` e por último `latest.yml`, para ninguém ver a versão antes do instalador estar lá.
-4. `npm run release:mac`: gera o `Kitty.app`, empacota em `out/Kitty-X.Y.Z-mac-arm64.dmg` e anexa ao mesmo release. Recusa rodar com alterações sem commit, porque o DMG sai da pasta atual.
+4. `npm run release:mac`: gera o `Kitty.app`, empacota em `out/Kitty-X.Y.Z-mac-arm64.dmg` (primeira instalação) e `.zip` (atualização) e anexa ao mesmo release, com o `latest-mac.yml` por último. Recusa sair sem a assinatura "Kitty Local", porque os Mac instalados recusariam a atualização.
+   - Depois, `npm run release:linux` (precisa do Docker Desktop aberto para o `.rpm`). Os dois recusam rodar com alterações sem commit.
    - Se a pasta tiver trabalho em andamento de outra pessoa, gere numa cópia limpa: `git worktree add --detach <pasta> <commit>`, copie `node_modules` (`cp -Rc`) e ligue `.venv` com um link simbólico (sem ele o Windows sai sem VMP, só com um aviso). Como o worktree fica sem branch, faça o push do `main` e os passos do `gh release` à mão, na ordem dos scripts.
 5. No Mac, `npm run install-app` atualiza o app local.
 6. Atualizar este arquivo (versão atual e histórico).
 
-Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório (senão a Castlabs recusa a assinatura VMP); no Mac a VMP vem antes da assinatura da Apple, no Windows depois; sem conta Castlabs EVS configurada os scripts só avisam e o app sai sem VMP. No Mac, `scripts/sign-mac.sh` assina com o certificado autoassinado "Kitty Local" (Keychain de login do Mac do dono, válido até 2036), para o macOS manter permissões como o Acesso Total ao Disco entre versões, inclusive para quem instala pelo DMG. Todas as builds e releases de Mac devem sair com ele: **não recrie o certificado** (um novo faz a permissão cair para todo mundo). Sem ele na máquina, o script avisa e cai para ad-hoc.
+Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório (senão a Castlabs recusa a assinatura VMP); no Mac a VMP vem antes da assinatura da Apple, no Windows depois; sem conta Castlabs EVS configurada os scripts só avisam e o app sai sem VMP. No Mac, `scripts/sign-mac.sh` assina com o certificado autoassinado "Kitty Local" (Keychain de login do Mac do dono, válido até 2036), para o macOS manter permissões como o Acesso Total ao Disco entre versões, inclusive para quem instala pelo DMG. Todas as builds e releases de Mac devem sair com ele: **não recrie o certificado** (um novo faz a permissão cair para todo mundo e quebra a atualização automática: os Mac instalados recusam o app novo e é preciso baixar o DMG à mão). Sem ele na máquina, o script avisa e cai para ad-hoc.
 
 ## O que falta
 
@@ -94,8 +98,8 @@ Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório 
 - [ ] Senhas: importar de outros navegadores; pedir a senha do Windows antes de mostrar (hoje só o Mac com Touch ID pede); preencher em iframes.
 - [ ] Extensões: atalhos de teclado (`commands`), painel lateral de verdade, nativeMessaging.
 - [ ] Importar do Safari (favoritos em `Bookmarks.plist`, histórico em `History.db`; exige Acesso Total ao Disco).
-- [ ] Suporte a Linux, como próximo passo futuro. Sem máquina Linux para testar, a validação precisa ser feita de outra forma (por exemplo, numa máquina virtual).
-- [ ] Mac: assinatura da Apple e atualização automática exigem Developer ID (pago). Enquanto isso, cada versão leva um DMG sem assinatura da Apple (`npm run release:mac`, depois do `release:win`, com o código sem alterações pendentes); o README ensina a liberar em Privacidade e Segurança. Primeiro DMG publicado: 0.2.4.
+- [ ] Linux: testar numa máquina de verdade (área de trabalho, sandbox do Chromium no Ubuntu 24.04 com AppArmor, navegador padrão, Widevine num site com DRM); atualização automática do AppImage; arm64.
+- [ ] Mac: assinatura da Apple (Developer ID, US$ 99/ano) tiraria o aviso da primeira abertura; a atualização automática já funciona sem ela.
 - [ ] Divulgar o projeto. O README é voltado para quem chega (prints em `docs/screenshots/`, tirados com perfil limpo via `KITTY_PROFILE`). Doações pelo GitHub Sponsors e pelo Buy Me a Coffee, configuradas em `.github/FUNDING.yml` (botão "Sponsor" do repositório) e na seção "Apoiar" do README.
 - [ ] Windows: assinatura de código para tirar o aviso do SmartScreen (certificado pago).
 - [ ] Lacunas de privacidade conhecidas: fingerprinting em workers carregados de URL e fontes no DOM; phishing só por listas abertas.

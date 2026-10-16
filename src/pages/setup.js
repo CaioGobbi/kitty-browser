@@ -84,7 +84,10 @@ function render(s) {
   $('widevine-later').hidden = s.widevineActive;
   $('update-row').hidden = !s.update.supported;
   $('update-note').hidden = s.update.supported;
-  $('update-note').textContent = t('A atualização automática do Kitty funciona só no app instalado.');
+  $('update-note').textContent =
+    s.platform === 'linux'
+      ? t('No Linux, o Kitty se atualiza rodando de novo o comando de instalação do README.')
+      : t('A atualização automática do Kitty funciona só no app instalado.');
 }
 
 // ---- Import (same flow as in Settings)
