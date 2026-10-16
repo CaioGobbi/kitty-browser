@@ -33,7 +33,7 @@ Dados do usuário no Mac: `~/Library/Application Support/Kitty` (`settings.json`
 
 ## Recursos de destaque recentes
 
-- **Importar de outro navegador** (0.2.4): em `kitty://settings` e no menu Favoritos. Favoritos não duplicam (por URL) e guardam a pasta de origem; a barra de favoritos mostra pastas de 1º nível como menus, e `kitty://bookmarks` agrupa por pasta. No macOS, quando o sistema bloqueia a leitura da pasta de outro navegador, o Kitty precisa de **Acesso Total ao Disco**; a tela de configurações detecta isso, avisa e explica o caminho em Ajustes do Sistema.
+- **Importar de outro navegador** (0.2.4): em `kitty://settings` e no menu Favoritos. Favoritos não duplicam (por URL) e guardam a pasta de origem; a barra de favoritos mostra pastas de 1º nível como menus, e `kitty://bookmarks` agrupa por pasta. No macOS, quando o sistema bloqueia a leitura da pasta de outro navegador, o Kitty precisa de **Acesso Total ao Disco**; a tela de configurações mostra esses navegadores com um cadeado e o botão "Dar permissão" abre Ajustes do Sistema. Como a assinatura ad-hoc muda a cada build (o requisito do app é o cdhash), o macOS esquece a permissão a cada atualização: o Kitty continua aparecendo ligado na lista, mas é preciso removê-lo (−) e adicionar de novo (+). Uma identidade de assinatura estável resolveria isso (ver "O que falta").
 - **Ícones no acesso rápido** (0.2.4): a nova aba mostra o favicon mais recente de cada site (até 300 guardados); limpar o histórico apaga os ícones.
 - **Abas fixadas, gestos e YouTube** (0.2.3): abas fixadas com animação, voltar/avançar com dois dedos usando as fases nativas do trackpad, e o YouTube sem scriptlets das listas, com um pulador próprio que esconde o anúncio.
 
