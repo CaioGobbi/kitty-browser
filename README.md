@@ -151,7 +151,8 @@ Achou um bug ou quer sugerir algo? Abra uma [issue](https://github.com/CaioGobbi
 O Kitty é gratuito e não tem anúncios nem coleta de dados. Se ele te ajuda, você pode apoiar o projeto:
 
 <a href="https://buymeacoffee.com/caiogobbii"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40"></a>
-<a href="https://github.com/sponsors/CaioGobbi"><img src="https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" height="40"></a>
+
+Ou pelo [GitHub Sponsors](https://github.com/sponsors/CaioGobbi), no botão **Sponsor** do topo da página.
 
 ## Licença
 
