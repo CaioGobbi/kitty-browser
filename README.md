@@ -148,7 +148,7 @@ Achou um bug ou quer sugerir algo? Abra uma [issue](https://github.com/CaioGobbi
 
 ## Apoiar
 
-O Kitty é gratuito e não tem anúncios nem coleta de dados. Se ele te ajuda, você pode apoiar o projeto pelo [GitHub Sponsors](https://github.com/sponsors/CaioGobbi).
+O Kitty é gratuito e não tem anúncios nem coleta de dados. Se ele te ajuda, você pode apoiar o projeto pelo [GitHub Sponsors](https://github.com/sponsors/CaioGobbi) ou com um café no [Buy Me a Coffee](https://buymeacoffee.com/caiogobbii).
 
 ## Licença
 

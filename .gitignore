@@ -5,3 +5,5 @@ out/
 native/*/build/
 src/main/native/
 *.log
+CLAUDE.local.md
+docs/resumo-do-projeto.md
