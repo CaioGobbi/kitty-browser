@@ -22,8 +22,12 @@
           <input type="checkbox" class="toggle" data-setting="widevine" />
         </label>
         <label class="row">
-          <span><strong>Mostrar barra de favoritos</strong><small>⇧⌘B</small></span>
-          <input type="checkbox" class="toggle" data-setting="showBookmarksBar" />
+          <span><strong>Barra de favoritos</strong><small>Quando mostrar a barra com os favoritos, logo abaixo do endereço. ⇧⌘B alterna entre sempre e só na nova aba.</small></span>
+          <select id="bookmarks-bar">
+            <option value="always">Sempre mostrar</option>
+            <option value="newtab">Só na nova aba</option>
+            <option value="never">Sempre esconder</option>
+          </select>
         </label>
         <label class="row">
           <span><strong>Layout das abas</strong><small>Clássico: abas em cima da barra de endereço. Compacto: tudo numa linha só, sobra mais espaço para a página. Abas verticais: abas numa coluna à esquerda.</small></span>

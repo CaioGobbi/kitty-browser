@@ -39,7 +39,7 @@ const SETTING_DEFAULTS = {
   permissions: {}, // { [origin]: { [permission]: 'allow' | 'deny' } }
   searchEngine: 'duckduckgo',
   searchSuggestions: true,
-  showBookmarksBar: true,
+  bookmarksBar: 'newtab', // 'always', 'newtab' (only on the new tab page) or 'never'
   tabLayout: 'classic', // 'classic' (tabs above the toolbar), 'compact' (one row) or 'vertical' (tabs on the side)
   verticalTabsCollapsed: false,
   restoreSession: true,
@@ -62,6 +62,9 @@ const SETTING_DEFAULTS = {
   extensionsPinned: [],
 };
 
+/** When the bookmarks bar shows: see `bookmarksBar` above. */
+const BOOKMARKS_BAR = ['always', 'newtab', 'never'];
+
 /** Where the tabs go: see `tabLayout` above. */
 const TAB_LAYOUTS = ['classic', 'compact', 'vertical'];
 
@@ -76,7 +79,7 @@ const DNS_PROVIDERS = {
 const EDITABLE_SETTINGS = {
   searchEngine: (v) => typeof v === 'string' && v in SEARCH_ENGINES,
   searchSuggestions: (v) => typeof v === 'boolean',
-  showBookmarksBar: (v) => typeof v === 'boolean',
+  bookmarksBar: (v) => BOOKMARKS_BAR.includes(v),
   tabLayout: (v) => TAB_LAYOUTS.includes(v),
   verticalTabsCollapsed: (v) => typeof v === 'boolean',
   restoreSession: (v) => typeof v === 'boolean',
@@ -112,6 +115,12 @@ function initData(userData) {
   data.favicons = new Store(path.join(userData, 'favicons.json'), { icons: {} }); // { [host]: { src, data } }
   // logins: [{ id, origin, username, password (encrypted by the OS, base64), created, updated, used }]; never: [origin]
   data.passwords = new Store(path.join(userData, 'passwords.json'), { logins: [], never: [] });
+  // Before `bookmarksBar` there was only on/off: off stays off, on becomes the new default.
+  if ('showBookmarksBar' in data.settings.data) {
+    if (data.settings.get('showBookmarksBar') === false) data.settings.set('bookmarksBar', 'never');
+    delete data.settings.data.showBookmarksBar;
+    data.settings.save();
+  }
   if (!(data.settings.get('searchEngine') in SEARCH_ENGINES)) data.settings.set('searchEngine', 'duckduckgo');
   // kitty://setup greets new people and, once, those updating from a version without it.
   if (!data.settings.get('setupDone') && !data.settings.get('setupFor')) data.settings.set('setupFor', firstRun ? 'new' : 'update');

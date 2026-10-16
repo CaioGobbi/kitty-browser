@@ -15,6 +15,7 @@ const actions = {
   openInternal: () => {},
   toggleBookmark: () => {},
   toggleBookmarksBar: () => {},
+  setBookmarksBar: () => {},
   setTabLayout: () => {},
   editBookmarks: () => ({}),
   bookmarkDialog: () => {},
@@ -36,6 +37,19 @@ function tabLayoutItems() {
     type: 'radio',
     checked: id === currentLayout,
     click: () => actions.setTabLayout(id),
+  }));
+}
+
+const BOOKMARKS_BAR_NAMES = { always: 'Sempre mostrar', newtab: 'Só na nova aba', never: 'Sempre esconder' };
+
+/** Radio items for when the bookmarks bar shows (Visualizar menu and the bar's right-click menu). */
+function bookmarksBarItems() {
+  const current = data.settings.get('bookmarksBar');
+  return Object.entries(BOOKMARKS_BAR_NAMES).map(([id, label]) => ({
+    label,
+    type: 'radio',
+    checked: id === current,
+    click: () => actions.setBookmarksBar(id),
   }));
 }
 
@@ -80,7 +94,14 @@ function buildAppMenu() {
       submenu: [
         { label: 'Recarregar', accelerator: 'CmdOrCtrl+R', click: withWin((w) => w.reload()) },
         { label: 'Recarregar sem cache', accelerator: 'CmdOrCtrl+Shift+R', click: withWin((w) => w.reload({ hard: true })) },
-        { label: 'Mostrar barra de favoritos', accelerator: 'CmdOrCtrl+Shift+B', click: () => actions.toggleBookmarksBar() },
+        {
+          label: 'Barra de favoritos',
+          submenu: [
+            ...bookmarksBarItems(),
+            { type: 'separator' },
+            { label: 'Mostrar ou esconder', accelerator: 'CmdOrCtrl+Shift+B', click: () => actions.toggleBookmarksBar() },
+          ],
+        },
         { label: 'Layout das abas', submenu: tabLayoutItems() },
         { type: 'separator' },
         { label: 'Ampliar', accelerator: 'CmdOrCtrl+Plus', click: withWin((w) => zoom(w, 0.5)) },
@@ -444,7 +465,11 @@ function bookmarkContextMenu(kwin, id, parentId = null) {
       ...creating,
     ];
   }
-  template.push({ type: 'separator' }, { label: 'Gerenciar favoritos', click: () => actions.openInternal('kitty://bookmarks') });
+  template.push(
+    { type: 'separator' },
+    { label: 'Mostrar barra de favoritos', submenu: bookmarksBarItems() },
+    { label: 'Gerenciar favoritos', click: () => actions.openInternal('kitty://bookmarks') },
+  );
   Menu.buildFromTemplate(template).popup({ window: kwin.win });
 }
 

@@ -53,7 +53,7 @@ const keys = (text) => (isMac ? text : pcShortcuts(text));
 let state = { activeTabId: null, tabs: [] };
 let bookmarks = [];
 let downloads = [];
-let uiSettings = { showBookmarksBar: true, tabLayout: 'classic', verticalTabsCollapsed: false, engineName: 'DuckDuckGo' };
+let uiSettings = { bookmarksBar: 'newtab', tabLayout: 'classic', verticalTabsCollapsed: false, engineName: 'DuckDuckGo' };
 let editing = false; // true while the user is typing in the address bar
 
 const ICONS = {
@@ -744,7 +744,9 @@ function folderButton(f) {
 
 function renderBookmarks() {
   const top = childrenOf(null);
-  bookmarksBar.hidden = !uiSettings.showBookmarksBar || top.length === 0;
+  const mode = uiSettings.bookmarksBar;
+  const onNewTab = !!activeTab()?.url?.startsWith('kitty://newtab');
+  bookmarksBar.hidden = top.length === 0 || mode === 'never' || (mode === 'newtab' && !onNewTab);
   bookmarksBar.replaceChildren(...top.map((b) => (isFolderItem(b) ? folderButton(b) : bookmarkButton(b))));
   if (openPopup === folderPanel) renderFolderPanel();
 }
@@ -1168,6 +1170,7 @@ api.onState((next) => {
   state = next;
   renderTabs();
   renderToolbar();
+  renderBookmarks();
 });
 api.onBookmarks((items) => {
   bookmarks = items;

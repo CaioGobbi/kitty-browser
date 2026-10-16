@@ -78,6 +78,7 @@ function render(s) {
   );
   dns.value = s.values.secureDns;
   $('tab-layout').value = s.values.tabLayout;
+  $('bookmarks-bar').value = s.values.bookmarksBar;
 
   const ago = (t) => {
     if (!t) return 'nunca';
@@ -153,6 +154,7 @@ $('make-default').addEventListener('click', async () => {
   setTimeout(async () => render(await settings.get()), 4000);
 });
 $('dns').addEventListener('change', async (e) => render(await settings.set('secureDns', e.target.value)));
+$('bookmarks-bar').addEventListener('change', async (e) => render(await settings.set('bookmarksBar', e.target.value)));
 $('tab-layout').addEventListener('change', async (e) => render(await settings.set('tabLayout', e.target.value)));
 $('update-lists').addEventListener('click', async (e) => {
   e.target.disabled = true;
