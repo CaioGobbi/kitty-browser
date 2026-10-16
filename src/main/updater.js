@@ -22,6 +22,8 @@ const state = {
 
 let autoUpdater = null;
 let beforeInstall = () => {};
+/** Whether Kitty may look for updates by itself (asked on kitty://setup). */
+let mayCheck = () => false;
 
 function publish() {
   registry.broadcast('update:state', { ...state });
@@ -32,8 +34,9 @@ function set(changes) {
   publish();
 }
 
-function init({ onBeforeInstall } = {}) {
+function init({ onBeforeInstall, canCheck } = {}) {
   if (onBeforeInstall) beforeInstall = onBeforeInstall;
+  if (canCheck) mayCheck = canCheck;
   if (!state.supported) return;
 
   ({ autoUpdater } = require('electron-updater'));
@@ -49,11 +52,13 @@ function init({ onBeforeInstall } = {}) {
   autoUpdater.on('update-downloaded', (info) => set({ status: 'ready', available: info.version, checkedAt: Date.now() }));
   autoUpdater.on('error', (err) => set({ status: 'error', error: String(err?.message || err).split('\n')[0] }));
 
-  // First check shortly after startup, then every few hours.
-  setTimeout(check, 15_000);
-  setInterval(check, CHECK_EVERY);
+  // First check shortly after startup, then every few hours, only if allowed.
+  const autoCheck = () => mayCheck() && check();
+  setTimeout(autoCheck, 15_000);
+  setInterval(autoCheck, CHECK_EVERY);
 }
 
+/** Checks now. Called on its own only when allowed; the button in Settings always works. */
 function check() {
   if (!autoUpdater || state.status === 'downloading' || state.status === 'ready') return;
   autoUpdater.checkForUpdates().catch(() => {}); // errors arrive through the 'error' event

@@ -18,6 +18,10 @@
           <input type="checkbox" class="toggle" data-setting="restoreSession" />
         </label>
         <label class="row">
+          <span><strong>Vídeos e músicas protegidos</strong><small>Baixa do Google o Widevine, necessário para Netflix, Spotify, Crunchyroll e outros serviços com proteção contra cópia. Ao mudar, reinicie o Kitty.</small></span>
+          <input type="checkbox" class="toggle" data-setting="widevine" />
+        </label>
+        <label class="row">
           <span><strong>Mostrar barra de favoritos</strong><small>⇧⌘B</small></span>
           <input type="checkbox" class="toggle" data-setting="showBookmarksBar" />
         </label>
@@ -94,6 +98,10 @@
           <span><strong>Proteção contra fingerprinting</strong><small>Adiciona um ruído imperceptível a canvas, áudio e dados do hardware, diferente em cada site. Vale a partir da próxima página aberta.</small></span>
           <input type="checkbox" class="toggle" data-setting="antiFingerprinting" />
         </label>
+        <label class="row">
+          <span><strong>Atualizar as listas de proteção sozinho</strong><small>Baixa versões novas das listas de anúncios e rastreadores (uma vez por dia) e de sites perigosos (a cada 6 horas). Desligado, o Kitty usa as listas que vieram com ele.</small></span>
+          <input type="checkbox" class="toggle" data-setting="autoUpdateLists" />
+        </label>
         <div class="row">
           <span><strong>Listas de proteção</strong><small id="lists-status"></small></span>
           <button id="update-lists">Atualizar agora</button>
@@ -131,9 +139,17 @@
 
       <section>
         <h2>Atualizações</h2>
+        <label class="row" id="auto-update-row">
+          <span><strong>Atualizar o Kitty sozinho</strong><small>Procura versões novas no GitHub a cada 4 horas e instala quando você reinicia o Kitty</small></span>
+          <input type="checkbox" class="toggle" data-setting="autoUpdate" />
+        </label>
         <div class="row">
           <span><strong>Kitty <span id="current-version"></span></strong><small id="update-status"></small></span>
           <button id="check-update">Procurar atualizações</button>
+        </div>
+        <div class="row">
+          <span><strong>Tela de boas-vindas</strong><small>Rever as escolhas do primeiro uso: buscador, atualizações e importação</small></span>
+          <a class="button" href="kitty://setup">Abrir</a>
         </div>
       </section>
 

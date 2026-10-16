@@ -83,3 +83,4 @@ select {
 .danger { color: var(--danger); }
 #cleared, .status { margin-left: 10px; color: var(--muted); }
 .about { color: var(--muted); font-size: 12px; text-align: center; }
+.row[hidden] { display: none; }

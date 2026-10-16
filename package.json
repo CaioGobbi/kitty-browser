@@ -19,8 +19,10 @@
     "release:win": "sh scripts/release-win.sh",
     "release:mac": "sh scripts/release-mac.sh",
     "build:native": "sh scripts/build-native.sh",
-    "predist": "npm run build:native",
-    "prestart": "[ -f src/main/native/swipe_phase.node ] || npm run build:native"
+    "predist": "npm run build:native && npm run lists",
+    "prestart": "[ -f src/main/native/swipe_phase.node ] || npm run build:native",
+    "lists": "electron scripts/build-lists.js",
+    "predist:win": "npm run lists"
   },
   "license": "MPL-2.0",
   "devDependencies": {

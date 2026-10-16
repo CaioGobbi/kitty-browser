@@ -9,6 +9,7 @@ TAG="v$VERSION"
 REPO=CaioGobbi/kitty-browser
 
 rm -rf out/windows
+npm run lists
 npx electron-builder --win nsis --x64 --publish never
 
 git push origin HEAD

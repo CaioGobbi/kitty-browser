@@ -6,7 +6,7 @@ const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { app, components, ipcMain, net, protocol, session, shell } = require('electron');
 
-const { data, initData, flushData, engine, hostOf, isInternal, SEARCH_ENGINES, DNS_PROVIDERS, EDITABLE_SETTINGS } = require('./data');
+const { data, initData, flushData, allowed, engine, hostOf, isInternal, SEARCH_ENGINES, DNS_PROVIDERS, EDITABLE_SETTINGS } = require('./data');
 const { registry } = require('./registry');
 const privacy = require('./privacy');
 const downloads = require('./downloads');
@@ -40,7 +40,12 @@ if (data.settings.get('blockThirdPartyCookies')) {
   app.commandLine.appendSwitch('test-third-party-cookie-phaseout');
 }
 
+// Chromium's component updater pings Google even with updates turned off, so
+// without the OK for Widevine it doesn't start at all.
+if (!allowed('widevine')) app.commandLine.appendSwitch('disable-component-update');
+
 const PAGES_DIR = path.join(__dirname, '..', 'pages');
+const SETUP_URL = 'kitty://setup';
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'kitty', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -85,9 +90,12 @@ function cleanUserAgent(ua) {
     .replace(/Chrome\/(\d+)\.[\d.]+/, 'Chrome/$1.0.0.0');
 }
 
-/** Encrypted DNS: falls back to the system resolver only if the provider can't be reached. */
+/**
+ * Encrypted DNS: falls back to the system resolver only if the provider can't
+ * be reached. Chromium probes the provider at startup, so it waits for kitty://setup.
+ */
 function applyDns() {
-  const provider = DNS_PROVIDERS[data.settings.get('secureDns')];
+  const provider = data.settings.get('setupDone') && DNS_PROVIDERS[data.settings.get('secureDns')];
   app.configureHostResolver({
     enableBuiltInResolver: true,
     secureDnsMode: provider ? 'automatic' : 'off',
@@ -289,7 +297,7 @@ function localSuggestions(query) {
 
 async function remoteSuggestions(query) {
   const api = engine().suggest;
-  if (!api || !data.settings.get('searchSuggestions')) return [];
+  if (!api || !allowed('searchSuggestions')) return [];
   try {
     const res = await fetch(api + encodeURIComponent(query), { signal: AbortSignal.timeout(1500) });
     const body = await res.json();
@@ -332,6 +340,8 @@ function settingsSnapshot() {
     canBeDefault: app.isPackaged,
     platform: process.platform,
     update: updater.snapshot(),
+    setup: { done: !!s.get('setupDone'), for: s.get('setupFor') || null },
+    widevineActive: !!components && !app.commandLine.hasSwitch('disable-component-update'),
     downloadsDir: app.getPath('downloads'),
     version: app.getVersion(),
   };
@@ -495,11 +505,27 @@ function registerIpc() {
   });
   ipcMain.handle('kitty:bookmarks', (event) => (fromPage(event, 'bookmarks') ? data.bookmarks.get('items') : []));
   ipcMain.handle('kitty:bookmark-op', (event, op) => (fromPage(event, 'bookmarks') ? editBookmarks(op) : null));
-  ipcMain.handle('kitty:settings', (event) => (fromPage(event, 'settings') ? settingsSnapshot() : null));
+  ipcMain.handle('kitty:settings', (event) => (fromPage(event, 'settings', 'setup') ? settingsSnapshot() : null));
+  ipcMain.handle('kitty:setup-finish', (event, choices) => {
+    if (!fromPage(event, 'setup') || typeof choices !== 'object' || !choices) return null;
+    for (const key of ['searchEngine', 'searchSuggestions', 'autoUpdateLists', 'autoUpdate', 'widevine']) {
+      if (EDITABLE_SETTINGS[key](choices[key])) data.settings.set(key, choices[key]);
+    }
+    data.settings.set('setupDone', true);
+    applyDns();
+    broadcastSettings();
+    // From now on the chosen connections may happen.
+    lists.refresh();
+    setupWidevine(allowed('widevine'));
+    if (allowed('autoUpdate')) setTimeout(updater.check, 5000);
+    return settingsSnapshot();
+  });
   ipcMain.handle('kitty:settings-set', (event, key, value) => {
     if (!fromPage(event, 'settings') || !EDITABLE_SETTINGS[key]?.(value)) return settingsSnapshot();
     data.settings.set(key, value);
     if (key === 'secureDns') applyDns();
+    if (key === 'autoUpdateLists' && value) lists.refresh();
+    if (key === 'widevine') setupWidevine(allowed('widevine'));
     broadcastSettings();
     return settingsSnapshot();
   });
@@ -549,7 +575,7 @@ function registerIpc() {
     if (fromPage(event, 'settings')) shell.openPath(app.getPath('downloads'));
   });
   ipcMain.handle('kitty:import-sources', (event) => {
-    if (!fromPage(event, 'settings')) return { sources: [], blocked: [] };
+    if (!fromPage(event, 'settings', 'setup')) return { sources: [], blocked: [] };
     return {
       sources: importer.listSources().map(({ id, name }) => ({ id, name })),
       blocked: importer.blockedBrowsers(),
@@ -557,12 +583,12 @@ function registerIpc() {
   });
   ipcMain.handle('kitty:import-open-privacy', (event) => {
     // macOS only lets Kitty read other browsers' data with Full Disk Access.
-    if (fromPage(event, 'settings') && process.platform === 'darwin') {
+    if (fromPage(event, 'settings', 'setup') && process.platform === 'darwin') {
       shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
     }
   });
   ipcMain.handle('kitty:import-run', (event, id, kinds) => {
-    if (!fromPage(event, 'settings') || !Array.isArray(kinds)) return null;
+    if (!fromPage(event, 'settings', 'setup') || !Array.isArray(kinds)) return null;
     try {
       const result = importer.importFrom(String(id), kinds.map(String), { bookmarks: data.bookmarks, history: data.history });
       broadcastBookmarks(); // even with nothing new, older imports may have gained folders
@@ -572,6 +598,26 @@ function registerIpc() {
       return { error: err.message };
     }
   });
+}
+
+/** Turns the Widevine download and its updates on or off (Chromium remembers it). */
+async function setupWidevine(enabled) {
+  if (!components) return;
+  components.updatesEnabled = enabled;
+  if (enabled) await components.whenReady().catch((err) => console.error('[kitty] Widevine indisponível:', err));
+}
+
+/**
+ * Until the person goes through kitty://setup, Kitty starts on it (keeping the
+ * restored tabs) and makes no connection by itself.
+ */
+function withSetupTab(saved) {
+  const setupTab = { url: SETUP_URL, title: 'Boas-vindas ao Kitty' };
+  if (!saved.length) saved.push({ tabs: [] });
+  const tabs = saved[0].tabs;
+  const index = tabs.findIndex((t) => t.url?.startsWith(SETUP_URL));
+  if (index < 0) tabs.push(setupTab);
+  saved[0].active = index < 0 ? tabs.length - 1 : index;
 }
 
 // ---------------------------------------------------------------------------
@@ -600,11 +646,9 @@ app.on('second-instance', (_event, argv) => {
 
 app.whenReady().then(async () => {
   if (!isPrimaryInstance) return;
-  // Castlabs Electron ships Widevine as a component; DRM video only plays
-  // once it is installed and ready.
-  if (components) {
-    await components.whenReady().catch((err) => console.error('[kitty] Widevine indisponível:', err));
-  }
+  // Castlabs Electron downloads Widevine from Google as a component; DRM
+  // video only plays once it is installed. Only with the person's OK.
+  await setupWidevine(allowed('widevine'));
 
   downloads.loadLog();
   app.userAgentFallback = cleanUserAgent(app.userAgentFallback);
@@ -640,14 +684,16 @@ app.whenReady().then(async () => {
   registerIpc();
   passwords.registerIpc({ fromPage, openPasswords: () => openInternal('kitty://passwords') });
   menus.buildAppMenu();
-  const listsReady = lists.init();
+  const listsReady = lists.init({ canUpdate: () => allowed('autoUpdateLists') });
 
-  const saved = data.settings.get('restoreSession') ? data.session.get('windows') : [];
+  const saved = data.settings.get('restoreSession') ? structuredClone(data.session.get('windows')) : [];
+  if (!data.settings.get('setupDone')) withSetupTab(saved);
   if (saved.length) for (const restore of saved) new KittyWindow({ restore });
   else new KittyWindow();
 
   ready = true;
   updater.init({
+    canCheck: () => allowed('autoUpdate'),
     onBeforeInstall: () => {
       saveSessionNow();
       quitting = true;
@@ -661,7 +707,7 @@ app.whenReady().then(async () => {
     if (registry.windows.size === 0) new KittyWindow();
   });
   await listsReady;
-  inlineBookmarkFavicons();
+  if (data.settings.get('setupDone')) inlineBookmarkFavicons();
 });
 
 app.on('window-all-closed', () => {

@@ -1,6 +1,7 @@
 'use strict';
 
 // Persistent stores shared across the main process.
+const fs = require('node:fs');
 const path = require('node:path');
 const { Store } = require('./store');
 
@@ -47,7 +48,14 @@ const SETTING_DEFAULTS = {
   dangerousSiteProtection: true,
   secureDns: 'quad9',
   offerPasswords: true,
+  // Connections Kitty makes by itself, chosen on kitty://setup. Until the
+  // person goes through that page (setupDone), none of them happens.
+  setupDone: false,
+  autoUpdateLists: true,
+  autoUpdate: true,
+  widevine: true, // DRM video (Netflix, Spotify…): downloaded from Google
 };
+
 
 /** Encrypted DNS (DNS over HTTPS) providers. */
 const DNS_PROVIDERS = {
@@ -69,6 +77,9 @@ const EDITABLE_SETTINGS = {
   dangerousSiteProtection: (v) => typeof v === 'boolean',
   secureDns: (v) => v === 'off' || v in DNS_PROVIDERS,
   offerPasswords: (v) => typeof v === 'boolean',
+  autoUpdateLists: (v) => typeof v === 'boolean',
+  autoUpdate: (v) => typeof v === 'boolean',
+  widevine: (v) => typeof v === 'boolean',
 };
 
 const data = {
@@ -82,6 +93,7 @@ const data = {
 };
 
 function initData(userData) {
+  const firstRun = !fs.existsSync(path.join(userData, 'settings.json'));
   data.settings = new Store(path.join(userData, 'settings.json'), SETTING_DEFAULTS);
   data.history = new Store(path.join(userData, 'history.json'), { entries: [] });
   data.bookmarks = new Store(path.join(userData, 'bookmarks.json'), { items: [] });
@@ -91,6 +103,13 @@ function initData(userData) {
   // logins: [{ id, origin, username, password (encrypted by the OS, base64), created, updated, used }]; never: [origin]
   data.passwords = new Store(path.join(userData, 'passwords.json'), { logins: [], never: [] });
   if (!(data.settings.get('searchEngine') in SEARCH_ENGINES)) data.settings.set('searchEngine', 'duckduckgo');
+  // kitty://setup greets new people and, once, those updating from a version without it.
+  if (!data.settings.get('setupDone') && !data.settings.get('setupFor')) data.settings.set('setupFor', firstRun ? 'new' : 'update');
+}
+
+/** Whether Kitty may connect by itself for this (a setting chosen on kitty://setup). */
+function allowed(setting) {
+  return !!data.settings.get('setupDone') && !!data.settings.get(setting);
 }
 
 function flushData() {
@@ -138,6 +157,7 @@ module.exports = {
   data,
   initData,
   flushData,
+  allowed,
   engine,
   searchUrl,
   hostOf,

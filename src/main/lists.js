@@ -1,10 +1,13 @@
 'use strict';
 
-// Filter lists, kept fresh: ads/trackers (Ghostery's EasyList/EasyPrivacy
-// bundle) and dangerous sites (phishing and malware). Engines are cached on
-// disk so startup is instant, then refreshed in the background.
+// Filter lists: ads/trackers (Ghostery's EasyList/EasyPrivacy bundle) and
+// dangerous sites (phishing and malware). A copy ships inside the app
+// (src/lists, made by scripts/build-lists.js), so blocking works offline from
+// the first launch. Newer versions are downloaded only once the person allows
+// it on kitty://setup; they are cached on disk and refreshed in the background.
 const path = require('node:path');
 const fs = require('node:fs');
+const zlib = require('node:zlib');
 const { app } = require('electron');
 const { ElectronBlocker, FiltersEngine } = require('@ghostery/adblocker-electron');
 
@@ -26,7 +29,11 @@ const lists = {
   malware: { engine: null, file: `malware-engine.v${THREAT_FORMAT}.bin`, maxAge: 6 * HOUR, updated: null },
 };
 
+const BUNDLED_DIR = path.join(__dirname, '..', 'lists');
+
 let refreshing = null;
+/** Whether Kitty may download lists by itself (asked on kitty://setup). */
+let mayUpdate = () => false;
 
 const cachePath = (list) => path.join(app.getPath('userData'), list.file);
 
@@ -52,15 +59,38 @@ function anchorHostnames(text) {
   return text.replace(/^([a-z0-9-]+(?:\.[a-z0-9-]+)+)$/gim, '||$1^');
 }
 
-async function loadCached(name) {
+/** When the copy that ships with the app was made (null in development without one). */
+function bundledTime() {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(BUNDLED_DIR, 'manifest.json'), 'utf8'));
+    return manifest.threatFormat === THREAT_FORMAT ? manifest.built : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Loads the downloaded copy or the one inside the app, whichever is newer. */
+async function loadSaved(name, bundled) {
   const list = lists[name];
   const Engine = name === 'ads' ? ElectronBlocker : FiltersEngine;
   try {
     const file = cachePath(list);
-    list.engine = Engine.deserialize(new Uint8Array(await fs.promises.readFile(file)));
-    list.updated = (await fs.promises.stat(file)).mtimeMs;
+    const mtime = (await fs.promises.stat(file)).mtimeMs;
+    if (!bundled || mtime > bundled) {
+      list.engine = Engine.deserialize(new Uint8Array(await fs.promises.readFile(file)));
+      list.updated = mtime;
+      return;
+    }
   } catch {
     // no cache (first run) or a cache from an incompatible version
+  }
+  if (!bundled) return;
+  try {
+    const packed = await fs.promises.readFile(path.join(BUNDLED_DIR, `${list.file}.gz`));
+    list.engine = Engine.deserialize(new Uint8Array(zlib.gunzipSync(packed)));
+    list.updated = bundled;
+  } catch (err) {
+    console.error(`[kitty] Lista "${name}" do app ilegível:`, err.message);
   }
 }
 
@@ -76,9 +106,13 @@ async function refreshOne(name) {
   }
 }
 
-/** Refreshes lists older than their max age (or all of them with force). */
+/**
+ * Refreshes lists older than their max age, if the person allowed automatic
+ * updates. force (the "Atualizar agora" button) updates all of them anyway.
+ */
 function refresh({ force = false } = {}) {
   if (refreshing) return refreshing;
+  if (!force && !mayUpdate()) return Promise.resolve();
   const stale = Object.keys(lists).filter((name) => force || !lists[name].updated || Date.now() - lists[name].updated > lists[name].maxAge);
   refreshing = Promise.all(stale.map(refreshOne)).finally(() => {
     refreshing = null;
@@ -86,12 +120,15 @@ function refresh({ force = false } = {}) {
   return refreshing;
 }
 
-async function init() {
-  await Promise.all(Object.keys(lists).map(loadCached));
-  // Lists without a cache are fetched right away; stale ones a bit later so
-  // they don't compete with the pages restored at startup.
+/** @param {{ canUpdate: () => boolean }} options */
+async function init({ canUpdate }) {
+  mayUpdate = canUpdate;
+  const bundled = bundledTime();
+  await Promise.all(Object.keys(lists).map((name) => loadSaved(name, bundled)));
+  // Missing lists are fetched right away; stale ones a bit later so they
+  // don't compete with the pages restored at startup.
   const missing = Object.keys(lists).filter((name) => !lists[name].engine);
-  await Promise.all(missing.map(refreshOne));
+  if (missing.length && mayUpdate()) await Promise.all(missing.map(refreshOne));
   setTimeout(() => refresh(), 30_000);
   setInterval(() => refresh(), HOUR);
 }
@@ -114,6 +151,9 @@ function status() {
 
 module.exports = {
   init,
+  build,
+  lists,
+  THREAT_FORMAT,
   refresh,
   status,
   threatFor,

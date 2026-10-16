@@ -88,7 +88,7 @@ function render(s) {
   };
   $('lists-status').textContent = s.lists.refreshing
     ? 'Atualizando…'
-    : `Anúncios e rastreadores: ${ago(s.lists.ads)} · Sites perigosos: ${ago(s.lists.threats)}. O Kitty atualiza sozinho.`;
+    : `Anúncios e rastreadores: ${ago(s.lists.ads)} · Sites perigosos: ${ago(s.lists.threats)}.`;
 
   $('default-status').textContent = !s.canBeDefault
     ? 'Disponível no app instalado (não no modo de desenvolvimento)'
@@ -124,12 +124,15 @@ function render(s) {
   const u = s.update;
   $('current-version').textContent = u.version;
   $('check-update').hidden = !u.supported || u.status === 'ready' || u.status === 'downloading';
+  $('auto-update-row').hidden = !u.supported;
   $('update-status').textContent = !u.supported
     ? s.platform === 'darwin'
       ? 'No Mac, a atualização automática exige uma assinatura paga da Apple. Por enquanto, instale as versões novas manualmente.'
       : 'Atualização automática disponível no app instalado.'
     : {
-        idle: 'O Kitty procura atualizações sozinho, a cada poucas horas, em github.com/caiogobbi/kitty-browser.',
+        idle: s.values.autoUpdate
+          ? 'O Kitty procura atualizações sozinho, a cada poucas horas, em github.com/caiogobbi/kitty-browser.'
+          : 'A busca automática está desligada. Use o botão para procurar agora.',
         checking: 'Procurando atualizações…',
         downloading: `Baixando a versão ${u.available}… ${u.progress}%`,
         ready: `A versão ${u.available} está pronta. Use o botão “Atualizar” na barra de ferramentas para reiniciar.`,

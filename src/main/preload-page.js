@@ -37,6 +37,7 @@ if (location.protocol === 'kitty:') {
       importSources: invoke('kitty:import-sources'),
       importRun: invoke('kitty:import-run'),
       importOpenPrivacy: invoke('kitty:import-open-privacy'),
+      finishSetup: invoke('kitty:setup-finish'),
     },
   });
 }
