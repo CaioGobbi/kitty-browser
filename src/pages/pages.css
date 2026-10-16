@@ -42,5 +42,14 @@ button {
   padding: 7px 14px;
   cursor: pointer;
 }
-button:hover { background: var(--surface-hover); }
+a.button {
+  display: inline-block;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 7px 14px;
+  white-space: nowrap;
+}
+button:hover,
+a.button:hover { background: var(--surface-hover); }
 .logo { color: var(--accent); fill: currentColor; }

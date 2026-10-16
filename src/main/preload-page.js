@@ -17,6 +17,14 @@ if (location.protocol === 'kitty:') {
     removeBookmark: invoke('kitty:bookmark-remove'),
     renameBookmark: invoke('kitty:bookmark-rename'),
     bypassThreat: invoke('kitty:threat-bypass'),
+    passwords: {
+      list: invoke('kitty:passwords'),
+      reveal: invoke('kitty:password-reveal'),
+      copy: invoke('kitty:password-copy'),
+      update: invoke('kitty:password-update'),
+      remove: invoke('kitty:password-remove'),
+      removeNever: invoke('kitty:password-never-remove'),
+    },
     settings: {
       get: invoke('kitty:settings'),
       set: invoke('kitty:settings-set'),
@@ -188,4 +196,195 @@ if (process.platform !== 'win32') {
     if (e.button === 3) ipcRenderer.send('gesture:navigate', 'back');
     if (e.button === 4) ipcRenderer.send('gesture:navigate', 'forward');
   });
+}
+
+// ---------------------------------------------------------------------------
+// Saved passwords (passwords.js). On web pages, Kitty notices when a login form
+// is sent, so it can offer to save it, and fills in accounts saved for the
+// page's own origin. Passwords only reach this script for that origin, and the
+// account list is drawn in a closed shadow root the page can't read.
+
+if (/^https?:$/.test(location.protocol) && window === window.top) {
+  const USER_TYPES = new Set(['text', 'email', 'tel', '']);
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  const seen = new WeakSet();
+  let accounts = null; // saved accounts for this origin, asked once per page
+  let picker = null;
+  const PICKER_CSS = `
+    :host { all: initial; position: fixed; z-index: 2147483647; }
+    .box { min-width: 220px; max-width: 360px; padding: 4px; border-radius: 10px; background: #211e29; color: #ece8f2;
+      border: 1px solid #2e2a38; box-shadow: 0 10px 30px rgba(0,0,0,.35); font: 13px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif; }
+    button { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 7px 10px; border-radius: 7px; cursor: default; }
+    button:hover, button:focus-visible { background: #2a2633; }
+    .user { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dots, .manage { color: #9a93a8; font-size: 12px; }
+    hr { border: 0; border-top: 1px solid #2e2a38; margin: 4px 2px; }`;
+
+  const visible = (el) => el.isConnected && !el.disabled && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  const passwordFields = (scope = document) => [...scope.querySelectorAll('input[type=password]')].filter(visible);
+
+  /** The username field of a password field: marked as such, or the last text field before it. */
+  function usernameFor(password) {
+    const scope = password.form || document;
+    const fields = [...scope.querySelectorAll('input')].filter((i) => USER_TYPES.has(i.type) && visible(i));
+    const marked = fields.find((i) => /username|email/i.test(i.autocomplete));
+    if (marked) return marked;
+    let last = null;
+    for (const f of fields) if (f.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING) last = f;
+    return last;
+  }
+
+  function setValue(input, value) {
+    if (!input) return;
+    // The native setter, so frameworks that track the value (React) see a change.
+    valueSetter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // ---- Offering to save
+
+  let lastSent = '';
+  function captureLogin(scope) {
+    const fields = passwordFields(scope).filter((f) => f.value);
+    if (!fields.length) return;
+    // Sign up (password + confirmation) or change password (old, new, new): the last one is the one to keep.
+    const password = fields.at(-1).value;
+    const username = usernameFor(fields[0])?.value.trim() || '';
+    const key = `${username}\n${password}`;
+    if (key === lastSent) return;
+    lastSent = key;
+    ipcRenderer.send('pw:submitted', { username, password });
+    // Single-page apps log in without navigating: the form going away means it worked.
+    const watched = fields[0];
+    let checks = 0;
+    const timer = setInterval(() => {
+      if (!visible(watched)) {
+        clearInterval(timer);
+        ipcRenderer.send('pw:form-gone');
+      } else if (++checks > 20) clearInterval(timer);
+    }, 500);
+  }
+
+  window.addEventListener('submit', (e) => captureLogin(e.target), true);
+  window.addEventListener(
+    'click',
+    (e) => {
+      const button = e.target instanceof Element && e.target.closest('button, input[type=submit], input[type=button], [role=button]');
+      if (!button) return;
+      const form = button.closest('form');
+      if (form ? passwordFields(form).length : passwordFields().length) captureLogin(form || document);
+    },
+    true,
+  );
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'Enter' || !(e.target instanceof HTMLInputElement)) return;
+      const form = e.target.form;
+      if (e.target.type === 'password' || (form && passwordFields(form).length)) captureLogin(form || document);
+    },
+    true,
+  );
+
+  // ---- Filling in
+
+  async function fill(id, password) {
+    const login = await ipcRenderer.invoke('pw:fill', id);
+    if (!login) return;
+    setValue(usernameFor(password), login.username);
+    setValue(password, login.password);
+  }
+
+  function closePicker() {
+    picker?.remove();
+    picker = null;
+  }
+
+  function openPicker(input) {
+    closePicker();
+    if (!accounts?.length) return;
+    const password = input.type === 'password' ? input : passwordFields(input.form || document)[0];
+    if (!password) return;
+    const host = document.createElement('kitty-passwords');
+    const root = host.attachShadow({ mode: 'closed' });
+    const r = input.getBoundingClientRect();
+    // Built without innerHTML: pages with Trusted Types would refuse it.
+    const style = document.createElement('style');
+    style.textContent = PICKER_CSS;
+    const box = document.createElement('div');
+    box.className = 'box';
+    root.append(style, box);
+    for (const account of accounts) {
+      const b = document.createElement('button');
+      const user = document.createElement('div');
+      user.className = 'user';
+      user.textContent = account.username || '(sem nome de usuário)';
+      const dots = document.createElement('div');
+      dots.className = 'dots';
+      dots.textContent = '•••••••• · senha salva no Kitty';
+      b.append(user, dots);
+      b.addEventListener('mousedown', (e) => e.preventDefault()); // keep the field focused
+      b.addEventListener('click', (e) => {
+        if (!e.isTrusted) return;
+        closePicker();
+        fill(account.id, password);
+      });
+      box.append(b);
+    }
+    const manage = document.createElement('button');
+    manage.className = 'manage';
+    manage.textContent = 'Gerenciar senhas…';
+    manage.addEventListener('mousedown', (e) => e.preventDefault());
+    manage.addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
+      closePicker();
+      ipcRenderer.send('pw:manage');
+    });
+    box.append(document.createElement('hr'), manage);
+    host.style.left = `${Math.max(4, Math.min(r.left, innerWidth - 230))}px`;
+    host.style.top = `${r.bottom + 4}px`;
+    document.documentElement.append(host);
+    picker = host;
+  }
+
+  async function scan() {
+    const fields = passwordFields();
+    const fresh = fields.filter((f) => !seen.has(f));
+    if (!fresh.length) return;
+    accounts ??= await ipcRenderer.invoke('pw:query').catch(() => []);
+    for (const password of fresh) {
+      seen.add(password);
+      const user = usernameFor(password);
+      // Not on the password field once a username was typed: the list would cover the form.
+      const wanted = (input) => !input.value && (input !== password || !user?.value);
+      for (const input of [password, user].filter(Boolean)) {
+        input.addEventListener('focus', () => wanted(input) && openPicker(input));
+        input.addEventListener('click', () => picker || (wanted(input) && openPicker(input)));
+        input.addEventListener('blur', () => setTimeout(closePicker, 150));
+        input.addEventListener('keydown', (e) => e.key === 'Escape' && closePicker());
+        input.addEventListener('input', closePicker);
+      }
+    }
+    // One saved account and a single login form (not sign up or change password):
+    // fill it in right away, like Firefox. Only on secure pages, never over HTTP.
+    const login = fresh[0];
+    const form = passwordFields(login.form || document);
+    if (accounts.length === 1 && isSecureContext && form.length === 1 && !login.value) {
+      await fill(accounts[0].id, login);
+      if (document.activeElement === login || document.activeElement === usernameFor(login)) closePicker();
+    }
+  }
+
+  let scanTimer = null;
+  const scanSoon = () => {
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(scan, 250);
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    scan();
+    new MutationObserver(scanSoon).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  window.addEventListener('scroll', closePicker, true);
+  window.addEventListener('resize', closePicker);
 }

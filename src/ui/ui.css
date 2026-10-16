@@ -617,7 +617,11 @@ body.private #private-badge {
 #perm-bar > svg {
   color: var(--warn);
 }
-#perm-text strong {
+#pw-bar > svg {
+  color: var(--accent);
+}
+#perm-text strong,
+#pw-text strong {
   font-weight: 600;
 }
 #find-input {

@@ -124,6 +124,7 @@ function buildAppMenu() {
       label: 'Ajustes',
       submenu: [
         { label: 'Configurações', accelerator: 'CmdOrCtrl+,', click: () => actions.openInternal('kitty://settings') },
+        { label: 'Senhas', click: () => actions.openInternal('kitty://passwords') },
       ],
     },
   ];

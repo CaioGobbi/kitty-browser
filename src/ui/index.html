@@ -73,6 +73,15 @@
         <button id="perm-allow" class="btn primary">Permitir</button>
       </div>
 
+      <div id="pw-bar" class="infobar" hidden>
+        <svg viewBox="0 0 16 16"><circle cx="5" cy="8" r="2.6" /><path d="M7.6 8H14M11.5 8v2.4M13.6 8v1.8" /></svg>
+        <span id="pw-text"></span>
+        <div class="spacer"></div>
+        <button id="pw-never" class="btn">Nunca neste site</button>
+        <button id="pw-dismiss" class="btn">Agora não</button>
+        <button id="pw-save" class="btn primary">Salvar</button>
+      </div>
+
       <div id="find-bar" class="infobar" hidden>
         <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4" /><path d="m10 10 3 3" /></svg>
         <input id="find-input" type="text" spellcheck="false" placeholder="Buscar na página" />
@@ -107,6 +116,7 @@
       <button data-action="history">Histórico<kbd>⌘Y</kbd></button>
       <button data-action="bookmarks">Favoritos<kbd>⌥⌘B</kbd></button>
       <button data-action="downloads">Downloads<kbd>⇧⌘J</kbd></button>
+      <button data-action="passwords">Senhas</button>
       <hr />
       <button data-action="find">Buscar na página<kbd>⌘F</kbd></button>
       <button data-action="settings">Configurações<kbd>⌘,</kbd></button>

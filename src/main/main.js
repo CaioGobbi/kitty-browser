@@ -14,6 +14,7 @@ const lists = require('./lists');
 const updater = require('./updater');
 const gestures = require('./gestures');
 const importer = require('./importer');
+const passwords = require('./passwords');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 
@@ -390,13 +391,14 @@ function registerIpc() {
     wc.reload();
   });
   ui('open:internal', (_w, page) => {
-    if (['history', 'bookmarks', 'settings'].includes(page)) openInternal(`kitty://${page}`);
+    if (['history', 'bookmarks', 'settings', 'passwords'].includes(page)) openInternal(`kitty://${page}`);
   });
   ui('window:private', () => newPrivateWindow());
   ui('window:new', () => newWindow());
   ui('find:query', (w, { text, forward, next } = {}) => w.find(text, { forward: forward !== false, next: !!next }));
   ui('find:stop', (w) => w.stopFind());
   ui('perm:answer', (w, { tabId, promptId, allow } = {}) => w.answerPrompt(tabId, promptId, allow));
+  ui('pw:answer', (w, answer) => passwords.answerOffer(w, answer));
   ui('bookmark:toggle', (w) => toggleBookmark(w));
   ui('bookmark:open', (w, { id, newTab } = {}) => {
     const b = data.bookmarks.get('items').find((x) => x.id === id);
@@ -608,6 +610,8 @@ app.whenReady().then(async () => {
   hooks.contextMenu = menus.pageContextMenu;
   hooks.shortcut = menus.handleShortcut;
   hooks.favicon = rememberFavicon;
+  hooks.tabCreated = passwords.watchTab;
+  hooks.passwordOffer = passwords.offerFor;
   Object.assign(menus.actions, {
     newWindow,
     newPrivateWindow,
@@ -624,6 +628,7 @@ app.whenReady().then(async () => {
   setupProfile(session.fromPartition('persist:kitty'), { isPrivate: false });
   privacy.registerPrivacyIpc();
   registerIpc();
+  passwords.registerIpc({ fromPage, openPasswords: () => openInternal('kitty://passwords') });
   menus.buildAppMenu();
   const listsReady = lists.init();
 

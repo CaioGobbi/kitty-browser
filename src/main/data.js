@@ -46,6 +46,7 @@ const SETTING_DEFAULTS = {
   stripTrackingParams: true,
   dangerousSiteProtection: true,
   secureDns: 'quad9',
+  offerPasswords: true,
 };
 
 /** Encrypted DNS (DNS over HTTPS) providers. */
@@ -67,6 +68,7 @@ const EDITABLE_SETTINGS = {
   stripTrackingParams: (v) => typeof v === 'boolean',
   dangerousSiteProtection: (v) => typeof v === 'boolean',
   secureDns: (v) => v === 'off' || v in DNS_PROVIDERS,
+  offerPasswords: (v) => typeof v === 'boolean',
 };
 
 const data = {
@@ -76,6 +78,7 @@ const data = {
   /** @type {Store} */ session: null,
   /** @type {Store} */ downloads: null,
   /** @type {Store} */ favicons: null,
+  /** @type {Store} */ passwords: null,
 };
 
 function initData(userData) {
@@ -85,6 +88,8 @@ function initData(userData) {
   data.session = new Store(path.join(userData, 'session.json'), { windows: [] });
   data.downloads = new Store(path.join(userData, 'downloads.json'), { items: [] });
   data.favicons = new Store(path.join(userData, 'favicons.json'), { icons: {} }); // { [host]: { src, data } }
+  // logins: [{ id, origin, username, password (encrypted by the OS, base64), created, updated, used }]; never: [origin]
+  data.passwords = new Store(path.join(userData, 'passwords.json'), { logins: [], never: [] });
   if (!(data.settings.get('searchEngine') in SEARCH_ENGINES)) data.settings.set('searchEngine', 'duckduckgo');
 }
 

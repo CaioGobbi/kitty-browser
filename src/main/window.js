@@ -17,8 +17,8 @@ const CLOSED_TABS_LIMIT = 25;
 
 let privateCounter = 0;
 
-/** Set by main.js: { setupProfile(ses, opts), onChange(), contextMenu(kwin, tab, params), shortcut(input), favicon(ses, pageUrl, iconUrl) } */
-const hooks = { setupProfile() {}, onChange() {}, contextMenu() {}, shortcut: () => false, favicon() {} };
+/** Set by main.js: { setupProfile(ses, opts), onChange(), contextMenu(kwin, tab, params), shortcut(input), favicon(ses, pageUrl, iconUrl), tabCreated(kwin, tab), passwordOffer(tab) } */
+const hooks = { setupProfile() {}, onChange() {}, contextMenu() {}, shortcut: () => false, favicon() {}, tabCreated() {}, passwordOffer: () => null };
 
 /** Windows/Linux draw the minimize/maximize/close buttons over the tab strip: match its colors. */
 function titleBarOverlay(isPrivate) {
@@ -163,6 +163,7 @@ class KittyWindow {
       bookmarked: isBookmarked(url),
       pinned: tab.pinned,
       prompt: prompt ? { id: prompt.id, origin: prompt.origin, label: prompt.label } : null,
+      passwordOffer: hooks.passwordOffer(tab),
     };
   }
 
@@ -249,6 +250,8 @@ class KittyWindow {
       pendingUrl: lazy ? url : null,
       pendingTitle: title,
       pinned,
+      pendingLogin: null, // a login form the page just submitted (passwords.js)
+      passwordOffer: null, // the "save password?" bar
     };
     // A blank new tab goes to the end of the strip; a link opened from a page
     // goes right next to the tab it came from.
@@ -340,6 +343,7 @@ class KittyWindow {
       this.layout();
     });
     wc.on('leave-html-full-screen', () => this.exitHtmlFullscreen());
+    hooks.tabCreated(this, tab);
   }
 
   exitHtmlFullscreen() {

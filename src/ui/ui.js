@@ -394,6 +394,7 @@ function renderToolbar() {
       : 'Escudos desativados neste site. Clique para reativar.';
 
   renderPermission(tab);
+  renderPasswordOffer(tab);
 }
 
 addressForm.addEventListener('submit', (e) => {
@@ -593,6 +594,31 @@ for (const [id, allow] of [['perm-allow', true], ['perm-deny', false]]) {
 }
 
 // ---------------------------------------------------------------------------
+// "Save password?" bar, after a login (passwords.js)
+
+const pwBar = $('pw-bar');
+
+function renderPasswordOffer(tab) {
+  const offer = tab?.passwordOffer;
+  pwBar.hidden = !offer;
+  if (!offer) return;
+  const host = offer.origin.replace(/^https?:\/\//, '');
+  const text = [document.createTextNode(offer.update ? 'Atualizar a senha salva' : 'Salvar a senha')];
+  if (offer.username) text.push(document.createTextNode(' de '), el('strong', '', offer.username));
+  text.push(document.createTextNode(' em '), el('strong', '', host), document.createTextNode('?'));
+  $('pw-text').replaceChildren(...text);
+  $('pw-save').textContent = offer.update ? 'Atualizar' : 'Salvar';
+  pwBar.dataset.tabId = tab.id;
+  pwBar.dataset.offerId = offer.id;
+}
+
+for (const [id, answer] of [['pw-save', 'save'], ['pw-never', 'never'], ['pw-dismiss', 'dismiss']]) {
+  $(id).addEventListener('click', () =>
+    api.answerPassword({ tabId: Number(pwBar.dataset.tabId), offerId: pwBar.dataset.offerId, answer }),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Find in page
 
 function openFind() {
@@ -749,7 +775,7 @@ menuPanel.addEventListener('click', (e) => {
   if (action === 'new-tab') api.newTab();
   if (action === 'private') api.newPrivateWindow();
   if (action === 'new-window') api.newWindow();
-  if (action === 'history' || action === 'bookmarks' || action === 'settings') api.openInternal(action);
+  if (['history', 'bookmarks', 'settings', 'passwords'].includes(action)) api.openInternal(action);
   if (action === 'downloads') toggleDownloads();
   if (action === 'find') openFind();
 });

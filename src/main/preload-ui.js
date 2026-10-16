@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
   find: send('find:query'),
   stopFind: send('find:stop'),
   answerPermission: send('perm:answer'),
+  answerPassword: send('pw:answer'),
   toggleBookmark: send('bookmark:toggle'),
   openBookmark: send('bookmark:open'),
   bookmarkMenu: send('bookmark:menu'),

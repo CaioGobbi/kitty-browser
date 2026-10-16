@@ -21,18 +21,20 @@ O Kitty é um navegador focado em privacidade, no estilo do Brave, feito em Elec
   - `window.js`: janelas (`BaseWindow`), abas (uma `WebContentsView` cada), layout, tela cheia, busca na página, histórico, permissões.
   - `privacy.js`: escudos, bloqueio (Ghostery), scriptlets, HTTPS automático, cookies, sites perigosos, tratamento do YouTube.
   - `importer.js`: importação de favoritos (com pastas) e histórico de Chrome, Brave, Edge, Vivaldi, Opera, Arc, Chromium e Firefox, lendo os arquivos locais, sem rede.
+  - `passwords.js`: senhas salvas (`passwords.json`, cada senha criptografada pelo sistema via `safeStorage`), a barra "Salvar a senha?" e a página de senhas. A detecção do login e o preenchimento ficam em `preload-page.js`.
   - `lists.js` (listas atualizadas sozinhas), `downloads.js`, `menus.js` (menus e atalhos), `updater.js` (atualização no Windows), `gestures.js` (gestos), `data.js`, `store.js`, `registry.js`.
   - Preloads: `preload-ui.js` (interface), `preload-page.js` (páginas `kitty://` e gestos), `preload-fingerprint.js`, `preload-scriptlets.js` (inclui o pulador de anúncios do YouTube).
 - `src/ui/` — barra de abas, endereço e painéis (a vista de cima de cada janela).
-- `src/pages/` — páginas internas `kitty://newtab`, `history`, `bookmarks`, `settings`, `blocked`, `error`.
+- `src/pages/` — páginas internas `kitty://newtab`, `history`, `bookmarks`, `settings`, `passwords`, `blocked`, `error`.
 - `native/swipe-phase/` — módulo nativo (Objective-C, N-API) que lê as fases do trackpad no Mac; compilado para `src/main/native/` (fora do git).
 - `scripts/` — build do ícone, do módulo nativo, assinatura VMP no Mac e no Windows, release do Windows e do Mac.
 - `assets/` — ícones, `Info.extra.plist` do Mac, `installer.nsh` (registro do navegador no Windows).
 
-Dados do usuário no Mac: `~/Library/Application Support/Kitty` (`settings.json`, `history.json`, `bookmarks.json`, `session.json`, `downloads.json`, listas `*-engine*.bin`).
+Dados do usuário no Mac: `~/Library/Application Support/Kitty` (`settings.json`, `history.json`, `bookmarks.json`, `session.json`, `downloads.json`, `passwords.json`, listas `*-engine*.bin`).
 
 ## Recursos de destaque recentes
 
+- **Gerenciador de senhas** (ainda não publicado): tudo local, sem sincronização. Ao enviar um formulário de login, a aba mostra "Salvar a senha?" (ou "Atualizar"), com "Nunca neste site". Na próxima visita, uma conta só é preenchida sozinha em páginas seguras (HTTPS ou localhost); com várias, aparece uma lista ao clicar no campo. `kitty://passwords` mostra, copia, edita e apaga; em Macs com Touch ID, mostrar ou copiar pede a digital (vale 5 min). Nada é salvo em janela privativa. Limitações: só o quadro principal da página (não iframes), e um login que falha e recarrega a página também oferece salvar.
 - **Importar de outro navegador** (0.2.4): em `kitty://settings` e no menu Favoritos. Favoritos não duplicam (por URL) e guardam a pasta de origem; a barra de favoritos mostra pastas de 1º nível como menus, e `kitty://bookmarks` agrupa por pasta. No macOS, quando o sistema bloqueia a leitura da pasta de outro navegador, o Kitty precisa de **Acesso Total ao Disco**; a tela de configurações mostra esses navegadores com um cadeado e o botão "Dar permissão" abre Ajustes do Sistema. Como a assinatura ad-hoc muda a cada build (o requisito do app é o cdhash), o macOS esquece a permissão a cada atualização: o Kitty continua aparecendo ligado na lista, mas é preciso removê-lo (−) e adicionar de novo (+). Uma identidade de assinatura estável resolveria isso (ver "O que falta").
 - **Ícones no acesso rápido** (0.2.4): a nova aba mostra o favicon mais recente de cada site (até 300 guardados); limpar o histórico apaga os ícones.
 - **Abas fixadas, gestos e YouTube** (0.2.3): abas fixadas com animação, voltar/avançar com dois dedos usando as fases nativas do trackpad, e o YouTube sem scriptlets das listas, com um pulador próprio que esconde o anúncio.
@@ -66,7 +68,7 @@ Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório 
 ## O que falta
 
 - [ ] Investigar a demora de uns 5 s na primeira abertura de vídeo no YouTube (não isolada).
-- [ ] Gerenciador de senhas (Keychain no Mac, cuidado com criptografia).
+- [ ] Senhas: importar de outros navegadores; pedir a senha do Windows antes de mostrar (hoje só o Mac com Touch ID pede); preencher em iframes.
 - [ ] Extensões do Chrome (o Electron só suporta parte).
 - [ ] Importar do Safari (favoritos em `Bookmarks.plist`, histórico em `History.db`; exige Acesso Total ao Disco).
 - [ ] Suporte a Linux, como próximo passo futuro. Sem máquina Linux para testar, a validação precisa ser feita de outra forma (por exemplo, numa máquina virtual).
