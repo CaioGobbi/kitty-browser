@@ -209,10 +209,12 @@ const YOUTUBE = /(^|\.)youtube\.com$/;
  * While the ad skipper fast-forwards an ad, nothing of it is shown: the video,
  * its overlays and the player controls go invisible (still clickable, so the
  * real "Skip" click lands) and the player stays black until the video starts.
+ * The video is hidden with visibility, not opacity: opacity 0 lifted it above
+ * the "Skip" button, so the click hit the video and paused/resumed the ad.
  */
 const YOUTUBE_AD_CSS = `
 #movie_player.ad-showing { background: #000 !important; }
-#movie_player.ad-showing video,
+#movie_player.ad-showing video { visibility: hidden !important; pointer-events: none !important; }
 #movie_player.ad-showing .video-ads,
 #movie_player.ad-showing .ytp-ad-module,
 #movie_player.ad-showing .ytp-ad-player-overlay,

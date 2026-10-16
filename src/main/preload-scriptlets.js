@@ -44,8 +44,13 @@ function youtubeAdSkipper() {
     const button = document.querySelector(SKIP_BUTTONS);
     const box = button?.getBoundingClientRect();
     if (box && box.width > 0 && box.height > 0 && Date.now() - lastClick > 600) {
+      const x = Math.round(box.left + box.width / 2);
+      const y = Math.round(box.top + box.height / 2);
+      // Only click when the button is what's under the point: a click that
+      // lands on the video pauses or resumes it instead of skipping.
+      if (!button.contains(document.elementFromPoint(x, y))) return;
       lastClick = Date.now();
-      ipcRenderer.send('kitty:click', { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) });
+      ipcRenderer.send('kitty:click', { x, y });
     }
   };
 
