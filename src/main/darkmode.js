@@ -78,14 +78,63 @@ function apply(tab, url) {
   }
   send(wc, 'Emulation.setEmulatedMedia', { features: mode ? [{ name: 'prefers-color-scheme', value: mode }] : [] });
   send(wc, 'Emulation.setAutoDarkModeOverride', mode === 'dark' ? { enabled: true } : mode === 'light' ? { enabled: false } : {});
+  tab.autoDark = mode === 'dark';
+}
+
+// Chromium's auto dark mode only skips pages that declare `color-scheme: dark`.
+// Many dark sites (YouTube…) don't, and darkening them again breaks their
+// design. So once the page is up, a page that is already dark loses the forced
+// dark: the background behind a few points of the page is sampled (computed
+// styles are the page's own colors, before the dark mode filter).
+const ALREADY_DARK = `(() => {
+  const rgb = (el) => {
+    for (; el; el = el.parentElement) {
+      const m = getComputedStyle(el).backgroundColor.match(/[\\d.]+/g);
+      if (m && (m.length < 4 || +m[3] > 0.5)) return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2];
+    }
+    return null;
+  };
+  const scheme = getComputedStyle(document.documentElement).colorScheme;
+  if (/dark/.test(scheme) && !/light/.test(scheme)) return true;
+  const w = innerWidth, h = innerHeight;
+  const points = [[w / 2, h / 2], [w / 2, h * 0.15], [w * 0.15, h / 2], [w * 0.85, h * 0.85]];
+  const lums = points.map(([x, y]) => rgb(document.elementFromPoint(x, y))).filter((l) => l !== null);
+  const root = rgb(document.body) ?? rgb(document.documentElement);
+  if (!lums.length && root === null) return false; // no background at all: white
+  const all = lums.length ? lums : [root];
+  return all.filter((l) => l < 100).length > all.length / 2;
+})()`;
+
+async function checkAlreadyDark(tab) {
+  const wc = tab.view.webContents;
+  if (!tab.autoDark || wc.isDestroyed()) return;
+  let dark = false;
+  try {
+    dark = await wc.executeJavaScriptInIsolatedWorld(1999, [{ code: ALREADY_DARK }]);
+  } catch {
+    return;
+  }
+  if (dark && tab.autoDark) {
+    tab.autoDark = false;
+    send(wc, 'Emulation.setAutoDarkModeOverride', { enabled: false });
+  }
 }
 
 /** Called for every new tab (window.js hooks.tabCreated). */
 function watchTab(tab) {
   const wc = tab.view.webContents;
   wc.on('did-start-navigation', (details) => {
-    if (details.isMainFrame && !details.isSameDocument) apply(tab, details.url);
+    if (!details.isMainFrame || details.isSameDocument) return;
+    if (tabs.get(tab) === 'dark' && !tab.autoDark) tabs.set(tab, null); // forced dark again for the new page
+    apply(tab, details.url);
   });
+  // Dark sites often switch to dark with a script after the first paint.
+  wc.on('dom-ready', () => checkAlreadyDark(tab));
+  wc.on('did-finish-load', () => {
+    checkAlreadyDark(tab);
+    setTimeout(() => checkAlreadyDark(tab), 1500);
+  });
+  wc.on('did-navigate-in-page', (_e, _url, isMainFrame) => isMainFrame && checkAlreadyDark(tab));
   wc.debugger.on('detach', () => tabs.has(tab) && tabs.set(tab, null));
   wc.once('destroyed', () => tabs.delete(tab));
   tabs.set(tab, null);
@@ -98,6 +147,7 @@ function refresh() {
     const wc = tab.view.webContents;
     tabs.set(tab, wc.debugger.isAttached() ? null : '');
     apply(tab, tab.pendingUrl || wc.getURL());
+    checkAlreadyDark(tab);
   }
 }
 
