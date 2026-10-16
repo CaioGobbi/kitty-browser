@@ -1,29 +1,43 @@
-<a href="https://buymeacoffee.com/caiogobbii"><img align="right" src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40"></a>
+<div align="center">
+    <img src="assets/icon.png" title="Kitty" alt="Ícone do Kitty" width="128" />
+    <h1>Kitty</h1>
+    <p>
+        O navegador rápido, bonito e focado em privacidade.
+    </p>
+    <a href="https://github.com/CaioGobbi/kitty-browser/releases/latest">Baixar</a>
+    ·
+    <a href="#o-que-já-tem">Recursos</a>
+    ·
+    <a href="#compilar">Compilar</a>
+    <br /><br />
+    <a href="https://buymeacoffee.com/caiogobbii"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40" /></a>
+</div>
 
-# 🐱 Kitty
+<br />
 
-Um navegador rápido e focado em privacidade, construído sobre o Chromium (via Electron), na mesma linha do Brave. Bloqueia anúncios e rastreadores, protege contra fingerprinting e phishing e não manda nenhum dado seu para ninguém: não há conta, telemetria nem servidor do Kitty.
+O Kitty é construído sobre o Chromium (via Electron), na mesma linha do Brave. Ele bloqueia anúncios e rastreadores, protege contra fingerprinting e phishing e não manda nenhum dado seu para ninguém: não há conta, telemetria nem servidor do Kitty.
 
 ![Nova aba do Kitty](docs/screenshots/nova-aba.png)
 
 ![Configurações de privacidade do Kitty](docs/screenshots/privacidade.png)
 
 ## Baixar
+> [!NOTE]
+> O Kitty ainda está no começo, então algo pode não funcionar como esperado.
+> Se encontrar um problema, [abra uma issue](https://github.com/CaioGobbi/kitty-browser/issues).
 
-**Windows 10/11 (64 bits):** baixe o `Kitty-Setup-*.exe` da [versão mais recente](https://github.com/CaioGobbi/kitty-browser/releases/latest) e abra. O Kitty se atualiza sozinho depois de instalado.
+As versões ficam no [GitHub Releases](https://github.com/CaioGobbi/kitty-browser/releases/latest):
 
-> O instalador ainda não tem assinatura digital, então o Windows SmartScreen avisa na primeira vez: clique em **Mais informações → Executar assim mesmo**.
+- **Windows 10/11 (64 bits):** `Kitty-Setup-*.exe`. O Kitty se atualiza sozinho depois de instalado.
+- **macOS (Apple Silicon, M1 ou mais novo):** `Kitty-*-mac-arm64.dmg`. Abra e arraste o Kitty para a pasta Aplicativos. No Mac ele ainda não se atualiza sozinho: para atualizar, baixe o DMG da versão nova.
+- **Linux:** ainda não é suportado.
 
-O instalador:
-- instala só para o usuário atual (sem pedir administrador), com atalhos na área de trabalho e no menu Iniciar;
-- registra o Kitty como navegador, para ele aparecer em Configurações → Apps → Aplicativos padrão;
-- remove tudo isso ao desinstalar (seus dados ficam em `%APPDATA%\Kitty`).
+> [!WARNING]
+> O Kitty ainda não tem assinatura digital da Microsoft nem da Apple, então o sistema avisa na primeira vez.
+> - **Windows:** no aviso do SmartScreen, clique em **Mais informações → Executar assim mesmo**.
+> - **Mac:** abra o Kitty uma vez e feche o aviso, vá em **Ajustes do Sistema → Privacidade e Segurança**, role até o fim e clique em **Abrir Mesmo Assim**. Depois disso ele abre normalmente.
 
-**macOS (Apple Silicon, M1 ou mais novo):** baixe o `Kitty-*-mac-arm64.dmg` da [versão mais recente](https://github.com/CaioGobbi/kitty-browser/releases/latest), abra e arraste o Kitty para a pasta Aplicativos.
-
-> O Kitty ainda não tem assinatura da Apple, então o macOS bloqueia na primeira vez que você abre. Para liberar: abra o Kitty uma vez e feche o aviso, vá em **Ajustes do Sistema → Privacidade e Segurança**, role até o fim e clique em **Abrir Mesmo Assim**. Depois disso ele abre normalmente. No Mac o Kitty ainda não se atualiza sozinho: para atualizar, baixe o DMG da versão nova.
-
-Linux ainda não é suportado.
+No Windows, o instalador instala só para o usuário atual (sem pedir administrador), cria atalhos na área de trabalho e no menu Iniciar e registra o Kitty como navegador, para ele aparecer em Configurações → Apps → Aplicativos padrão. Ao desinstalar, tudo isso é removido, e seus dados ficam em `%APPDATA%\Kitty`.
 
 ## O que já tem
 
