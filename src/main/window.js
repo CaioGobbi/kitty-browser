@@ -337,6 +337,12 @@ class KittyWindow {
       tab.owner.recordHistory(wc);
       tab.owner.sendState();
     });
+    wc.on('focus', () => {
+      if (tab.keepAddressFocus && tab.owner.activeId === tab.id) tab.owner.focusAddressBar();
+    });
+    wc.on('did-stop-loading', () => {
+      tab.keepAddressFocus = false;
+    });
     wc.on('did-navigate-in-page', (_e, _url, isMainFrame) => {
       if (isMainFrame) tab.owner.recordHistory(wc);
       tab.owner.sendState();
@@ -426,8 +432,12 @@ class KittyWindow {
 
     if (!focus) return;
     const url = tab.view.webContents.getURL();
-    if (!url || isInternal(url)) this.focusAddressBar();
-    else tab.view.webContents.focus();
+    if (!url || isInternal(url)) {
+      this.focusAddressBar();
+      // A page that hasn't loaded yet takes the focus when Chromium sets it up:
+      // give it back to the address bar until the load ends (see wireTab).
+      tab.keepAddressFocus = tab.view.webContents.isLoading() || !url;
+    } else tab.view.webContents.focus();
   }
 
   closeTab(id = this.activeId) {

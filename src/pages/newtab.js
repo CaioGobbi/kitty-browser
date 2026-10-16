@@ -3,14 +3,6 @@
 // No search box here: typing goes to the address bar, which gets the focus
 // when a new tab opens (switchTab in window.js).
 
-function formatSaved(blocked) {
-  // Rough estimate, like Brave: ~50 ms of load time saved per blocked request.
-  const seconds = Math.round(blocked * 0.05);
-  if (seconds < 60) return `${seconds} s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
-  return `${(seconds / 3600).toFixed(1).replace('.', ',')} h`;
-}
-
 window.kitty.context().then((ctx) => {
   if (!ctx) return;
   document.body.classList.toggle('private', ctx.isPrivate);
@@ -20,9 +12,6 @@ window.kitty.context().then((ctx) => {
 
 window.kitty.stats().then((stats) => {
   if (!stats) return;
-  document.getElementById('blocked').textContent = stats.blockedTotal.toLocaleString('pt-BR');
-  document.getElementById('saved').textContent = formatSaved(stats.blockedTotal);
-
   const recent = document.getElementById('recent');
   for (const site of stats.recent) {
     const a = document.createElement('a');
