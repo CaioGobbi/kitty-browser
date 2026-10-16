@@ -15,6 +15,7 @@ const actions = {
   openInternal: () => {},
   toggleBookmark: () => {},
   toggleBookmarksBar: () => {},
+  setTabLayout: () => {},
   editBookmarks: () => ({}),
   bookmarkDialog: () => {},
 };
@@ -24,6 +25,19 @@ const withWin = (fn) => () => {
   const kwin = current();
   if (kwin) fn(kwin);
 };
+
+const TAB_LAYOUT_NAMES = { classic: 'Clássico', compact: 'Compacto', vertical: 'Abas verticais' };
+
+/** Radio items to pick where the tabs go (Visualizar menu and the tab's right-click menu). */
+function tabLayoutItems() {
+  const currentLayout = data.settings.get('tabLayout');
+  return Object.entries(TAB_LAYOUT_NAMES).map(([id, label]) => ({
+    label,
+    type: 'radio',
+    checked: id === currentLayout,
+    click: () => actions.setTabLayout(id),
+  }));
+}
 
 function buildAppMenu() {
   const template = [
@@ -67,6 +81,7 @@ function buildAppMenu() {
         { label: 'Recarregar', accelerator: 'CmdOrCtrl+R', click: withWin((w) => w.reload()) },
         { label: 'Recarregar sem cache', accelerator: 'CmdOrCtrl+Shift+R', click: withWin((w) => w.reload({ hard: true })) },
         { label: 'Mostrar barra de favoritos', accelerator: 'CmdOrCtrl+Shift+B', click: () => actions.toggleBookmarksBar() },
+        { label: 'Layout das abas', submenu: tabLayoutItems() },
         { type: 'separator' },
         { label: 'Ampliar', accelerator: 'CmdOrCtrl+Plus', click: withWin((w) => zoom(w, 0.5)) },
         { label: 'Ampliar', accelerator: 'CmdOrCtrl+=', visible: false, click: withWin((w) => zoom(w, 0.5)) },
@@ -337,7 +352,7 @@ function tabContextMenu(kwin, id) {
   const index = kwin.order.indexOf(id);
   const muted = tab.view.webContents.isAudioMuted();
   Menu.buildFromTemplate([
-    { label: 'Nova aba à direita', click: () => kwin.createTab(undefined, { index: tab.pinned ? kwin.order.length : index + 1 }) },
+    { label: data.settings.get('tabLayout') === 'vertical' ? 'Nova aba abaixo' : 'Nova aba à direita', click: () => kwin.createTab(undefined, { index: tab.pinned ? kwin.order.length : index + 1 }) },
     { type: 'separator' },
     { label: 'Recarregar', click: () => tab.view.webContents.reload() },
     { label: 'Duplicar', click: () => kwin.duplicateTab(id) },
@@ -347,12 +362,14 @@ function tabContextMenu(kwin, id) {
     { label: 'Fechar aba', click: () => kwin.closeTab(id) },
     { label: 'Fechar outras abas', enabled: kwin.order.length > 1, click: () => kwin.closeOtherTabs(id) },
     {
-      label: 'Fechar abas à direita',
+      label: data.settings.get('tabLayout') === 'vertical' ? 'Fechar abas abaixo' : 'Fechar abas à direita',
       enabled: index < kwin.order.length - 1,
       click: () => kwin.closeOtherTabs(id, { onlyRight: true }),
     },
     { type: 'separator' },
     { label: 'Reabrir aba fechada', enabled: kwin.closedTabs.length > 0, click: () => kwin.reopenClosedTab() },
+    { type: 'separator' },
+    { label: 'Layout das abas', submenu: tabLayoutItems() },
   ]).popup({ window: kwin.win });
 }
 

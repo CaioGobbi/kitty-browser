@@ -40,6 +40,8 @@ const SETTING_DEFAULTS = {
   searchEngine: 'duckduckgo',
   searchSuggestions: true,
   showBookmarksBar: true,
+  tabLayout: 'classic', // 'classic' (tabs above the toolbar), 'compact' (one row) or 'vertical' (tabs on the side)
+  verticalTabsCollapsed: false,
   restoreSession: true,
   httpsUpgrade: true,
   blockThirdPartyCookies: true,
@@ -56,6 +58,8 @@ const SETTING_DEFAULTS = {
   widevine: true, // DRM video (Netflix, Spotify…): downloaded from Google
 };
 
+/** Where the tabs go: see `tabLayout` above. */
+const TAB_LAYOUTS = ['classic', 'compact', 'vertical'];
 
 /** Encrypted DNS (DNS over HTTPS) providers. */
 const DNS_PROVIDERS = {
@@ -69,6 +73,8 @@ const EDITABLE_SETTINGS = {
   searchEngine: (v) => typeof v === 'string' && v in SEARCH_ENGINES,
   searchSuggestions: (v) => typeof v === 'boolean',
   showBookmarksBar: (v) => typeof v === 'boolean',
+  tabLayout: (v) => TAB_LAYOUTS.includes(v),
+  verticalTabsCollapsed: (v) => typeof v === 'boolean',
   restoreSession: (v) => typeof v === 'boolean',
   httpsUpgrade: (v) => typeof v === 'boolean',
   blockThirdPartyCookies: (v) => typeof v === 'boolean',

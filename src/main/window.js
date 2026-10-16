@@ -71,6 +71,9 @@ class KittyWindow {
     this.closedTabs = [];
     this.privatePermissions = {};
     this.chromeHeight = DEFAULT_CHROME_HEIGHT;
+    this.chromeLeft = 0; // width of the vertical tab strip, when tabs are on the side
+    /** Where the tabs are, in window content coordinates, for dragging tabs between windows (tabdrag.js). */
+    this.strip = { x: 0, y: 0, width: Infinity, height: 40, vertical: false };
     this.overlay = false;
     this.htmlFullscreen = false;
     this.findText = '';
@@ -104,7 +107,13 @@ class KittyWindow {
     this.ui.setBackgroundColor('#00000000');
     listenForShortcuts(this.ui.webContents);
     this.win.contentView.addChildView(this.ui);
-    this.ui.webContents.loadFile(path.join(UI_DIR, 'index.html'), { query: { private: isPrivate ? '1' : '0' } });
+    this.ui.webContents.loadFile(path.join(UI_DIR, 'index.html'), {
+      query: {
+        private: isPrivate ? '1' : '0',
+        layout: data.settings.get('tabLayout'),
+        collapsed: data.settings.get('verticalTabsCollapsed') ? '1' : '0',
+      },
+    });
     this.ui.webContents.once('did-finish-load', () => {
       if (adopt) return;
       if (restore?.tabs?.length) this.restoreTabs(restore);
@@ -209,14 +218,24 @@ class KittyWindow {
       return;
     }
     this.ui.setVisible(true);
-    this.ui.setBounds({ x: 0, y: 0, width, height: this.overlay ? height : this.chromeHeight });
-    tab?.view.setBounds({ x: 0, y: this.chromeHeight, width, height: Math.max(0, height - this.chromeHeight) });
+    // With tabs on the side the UI is L-shaped, so its view covers the whole
+    // window and the page goes on top of it; a dropdown brings the UI back up.
+    const left = this.chromeLeft;
+    this.ui.setBounds({ x: 0, y: 0, width, height: this.overlay || left ? height : this.chromeHeight });
+    tab?.view.setBounds({ x: left, y: this.chromeHeight, width: Math.max(0, width - left), height: Math.max(0, height - this.chromeHeight) });
+    const top = this.overlay || !left ? this.ui : tab?.view;
+    const children = this.win.contentView.children;
+    if (top && children.at(-1) !== top) this.win.contentView.addChildView(top); // already a child: just moves to the top
   }
 
-  /** The UI asks for more room (bars) or the whole window (dropdowns). */
-  setChrome({ height, overlay }) {
+  /** The UI asks for more room (bars, the side tab strip) or the whole window (dropdowns). */
+  setChrome({ height, left, overlay, strip }) {
     if (Number.isFinite(height)) this.chromeHeight = Math.max(40, Math.min(400, Math.round(height)));
+    if (Number.isFinite(left)) this.chromeLeft = Math.max(0, Math.min(600, Math.round(left)));
     if (typeof overlay === 'boolean') this.overlay = overlay;
+    if (strip && ['x', 'y', 'width', 'height'].every((k) => Number.isFinite(strip[k]))) {
+      this.strip = { x: strip.x, y: strip.y, width: strip.width, height: strip.height, vertical: !!strip.vertical };
+    }
     this.layout();
   }
 

@@ -15,7 +15,6 @@ const { screen } = require('electron');
 const { registry } = require('./registry');
 const { KittyWindow } = require('./window');
 
-const STRIP_HEIGHT = 40; // #tabstrip in ui.css
 const MAGNETISM = 15; // Chromium's kVerticalDetachMagnetism: the strip reaches this far up and down
 
 /**
@@ -33,14 +32,17 @@ let drag = null;
 
 const alive = (kwin) => kwin && !kwin.win.isDestroyed();
 
+/** Whether `point` is over the tab strip of `kwin` (on top or, with vertical tabs, on the side). */
 function inStrip(kwin, point) {
   const b = kwin.win.getContentBounds();
-  return (
-    point.x >= b.x &&
-    point.x < b.x + b.width &&
-    point.y >= b.y - MAGNETISM &&
-    point.y <= b.y + STRIP_HEIGHT + MAGNETISM
-  );
+  const s = kwin.strip;
+  const x = b.x + s.x;
+  const y = b.y + s.y;
+  const width = Math.min(s.width, b.width - s.x);
+  if (s.vertical) {
+    return point.x >= x - MAGNETISM && point.x <= x + width + MAGNETISM && point.y >= y && point.y < y + s.height;
+  }
+  return point.x >= x && point.x < x + width && point.y >= y - MAGNETISM && point.y <= y + s.height + MAGNETISM;
 }
 
 /** The window whose tab strip is under `point`, other than the floating one. */
@@ -53,18 +55,27 @@ function stripAt(point) {
   return candidates.find((w) => inStrip(w, point)) || null;
 }
 
-/** Where the middle of each tab of `kwin` is on screen (the dragged tab isn't there yet). */
+/**
+ * Where the middle of each tab of `kwin` is on screen (the dragged tab isn't
+ * there yet), across the strip: x on top, y on the side.
+ */
 async function measureSlots(kwin) {
-  const left = kwin.win.getContentBounds().x;
+  const { vertical } = kwin.strip;
+  const b = kwin.win.getContentBounds();
   const mids = await kwin.ui.webContents
     .executeJavaScript(
-      `[...document.querySelectorAll('#tabs .tab:not(.closing)')].map((t) => { const r = t.getBoundingClientRect(); return r.left + r.width / 2; })`,
+      `[...document.querySelectorAll('#tabs .tab:not(.closing)')].map((t) => { const r = t.getBoundingClientRect(); return ${
+        vertical ? 'r.top + r.height / 2' : 'r.left + r.width / 2'
+      }; })`,
     )
     .catch(() => []);
-  return mids.map((mid) => left + mid);
+  return { vertical, mids: mids.map((mid) => (vertical ? b.y : b.x) + mid) };
 }
 
-const indexAt = (x) => drag.slots.filter((mid) => mid < x).length;
+const indexAt = (point) => {
+  const at = drag.slots.vertical ? point.y : point.x;
+  return drag.slots.mids.filter((mid) => mid < at).length;
+};
 
 /** Makes the floating window vanish without hiding it: it may be the window holding the pointer. */
 function setFloatingVisible(kwin, visible) {
@@ -83,7 +94,7 @@ async function attach(target, cursor) {
   drag.slots = slots;
   drag.attached = target;
   setFloatingVisible(drag.floating, false);
-  target.adoptTab(tab, indexAt(cursor.x), { focus: false });
+  target.adoptTab(tab, indexAt(cursor), { focus: false });
 }
 
 function detach(cursor) {
@@ -131,7 +142,7 @@ function move() {
     if (!alive(attached)) return void (drag = null);
     if (!inStrip(attached, cursor)) return detach(cursor);
     // Slides along the strip, like a reorder.
-    const index = indexAt(cursor.x);
+    const index = indexAt(cursor);
     const pinned = attached.tabs.get(drag.tabId)?.pinned;
     if (attached.order.indexOf(drag.tabId) !== attached.clampToGroup(index, pinned)) attached.moveTab(drag.tabId, index);
     return;

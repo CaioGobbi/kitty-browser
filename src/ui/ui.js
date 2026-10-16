@@ -4,6 +4,9 @@ const api = window.kittyUI;
 const $ = (id) => document.getElementById(id);
 
 const chrome = $('chrome');
+const tabstrip = $('tabstrip');
+const toolbar = $('toolbar');
+const sidebar = $('sidebar');
 const tabsEl = $('tabs');
 const address = $('address');
 const addressForm = $('address-form');
@@ -50,7 +53,7 @@ const keys = (text) => (isMac ? text : pcShortcuts(text));
 let state = { activeTabId: null, tabs: [] };
 let bookmarks = [];
 let downloads = [];
-let uiSettings = { showBookmarksBar: true, engineName: 'DuckDuckGo' };
+let uiSettings = { showBookmarksBar: true, tabLayout: 'classic', verticalTabsCollapsed: false, engineName: 'DuckDuckGo' };
 let editing = false; // true while the user is typing in the address bar
 
 const ICONS = {
@@ -97,17 +100,74 @@ function letterFor(url, cls = 'letter') {
 }
 
 // ---------------------------------------------------------------------------
-// Layout: tell the main process how tall the browser UI is, and when a popup
+// Layout: tell the main process how much room the browser UI takes (on top,
+// and on the side with vertical tabs), where the tabs are, and when a popup
 // needs the whole window.
 
-let lastHeight = 0;
-new ResizeObserver(() => {
-  const height = Math.ceil(chrome.getBoundingClientRect().height);
-  if (height !== lastHeight) {
-    lastHeight = height;
-    api.setChrome({ height });
+// Three ways to lay out tabs and toolbar, picked in Settings (`tabLayout`):
+// classic (tabs above the toolbar), compact (one row: navigation, address,
+// tabs, buttons) and vertical (toolbar on top, tabs in a column on the side).
+// The same elements move between #tabstrip, #toolbar and #sidebar, keeping
+// their listeners.
+let tabLayout = 'classic';
+document.body.classList.add('layout-classic');
+const isVertical = () => tabLayout === 'vertical';
+const tabstripParts = [...tabstrip.children]; // tabs, new tab, drag area, private badge
+const toolbarParts = [...toolbar.children];
+const navParts = toolbarParts.slice(0, toolbarParts.indexOf(addressForm) + 1); // back … address bar
+const toolParts = toolbarParts.slice(navParts.length); // shields … menu
+
+function applyLayout() {
+  const layout = ['compact', 'vertical'].includes(uiSettings.tabLayout) ? uiSettings.tabLayout : 'classic';
+  const collapsed = layout === 'vertical' && !!uiSettings.verticalTabsCollapsed;
+  document.body.classList.toggle('sidebar-collapsed', collapsed);
+  const collapseBtn = $('sidebar-collapse');
+  collapseBtn.title = collapsed ? 'Expandir abas' : 'Recolher abas';
+  collapseBtn.setAttribute('aria-label', collapseBtn.title);
+  if (layout !== tabLayout) {
+    const typing = document.activeElement === address;
+    tabLayout = layout;
+    for (const name of ['classic', 'compact', 'vertical']) document.body.classList.toggle(`layout-${name}`, name === layout);
+    const [tabs, newTab, dragFill, privateBadge] = tabstripParts;
+    if (layout === 'compact') {
+      tabstrip.replaceChildren(...navParts, tabs, newTab, dragFill, privateBadge, ...toolParts);
+    } else if (layout === 'vertical') {
+      tabstrip.replaceChildren(dragFill);
+      toolbar.replaceChildren(...navParts, privateBadge, ...toolParts);
+      sidebar.prepend(tabs, newTab);
+    } else {
+      tabstrip.replaceChildren(...tabstripParts);
+      toolbar.replaceChildren(...toolbarParts);
+    }
+    tabstrip.hidden = layout === 'vertical';
+    toolbar.hidden = layout === 'compact';
+    sidebar.hidden = layout !== 'vertical';
+    if (typing) address.focus();
+    // The tabs just changed places: no sliding from where they were.
+    firstRender = true;
+    renderTabs();
   }
-}).observe(chrome);
+  reportLayout();
+}
+
+let lastLayout = '';
+function reportLayout() {
+  const vertical = isVertical();
+  const height = Math.ceil(chrome.getBoundingClientRect().height);
+  const left = vertical ? Math.ceil(sidebar.getBoundingClientRect().width) : 0;
+  const r = (vertical ? sidebar : tabstrip).getBoundingClientRect();
+  const strip = { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height), vertical };
+  const key = JSON.stringify([height, left, strip]);
+  if (key === lastLayout) return;
+  lastLayout = key;
+  api.setChrome({ height, left, strip });
+}
+
+const layoutObserver = new ResizeObserver(() => reportLayout());
+layoutObserver.observe(chrome);
+layoutObserver.observe(sidebar);
+
+$('sidebar-collapse').addEventListener('click', () => api.setLayoutSetting('verticalTabsCollapsed', !uiSettings.verticalTabsCollapsed));
 
 let openPopup = null;
 function showPopup(popup, position) {
@@ -177,14 +237,15 @@ function animateLayout(change, { except } = {}) {
     resized.push([node, old.width, width]);
     node.style.minWidth = node.style.maxWidth = `${old.width}px`;
   }
-  const after = new Map(liveTabs().map((node) => [node, node.getBoundingClientRect().left]));
+  const after = new Map(liveTabs().map((node) => [node, node.getBoundingClientRect()]));
   for (const [node] of resized) node.style.minWidth = node.style.maxWidth = '';
 
   const timing = { duration: 260, easing: EASE };
   for (const node of liveTabs()) {
     if (node === except || !before.has(node)) continue;
-    const dx = before.get(node).left - after.get(node);
-    if (Math.abs(dx) >= 1) node.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], timing);
+    const dx = before.get(node).left - after.get(node).left;
+    const dy = before.get(node).top - after.get(node).top;
+    if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) node.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], timing);
   }
   for (const [node, from, to] of resized) {
     node.animate(
@@ -197,8 +258,22 @@ function animateLayout(change, { except } = {}) {
   }
 }
 
+/** With vertical tabs, a tab row opens and closes in height (pinned ones, in a grid, still in width). */
+const growsDown = (node) => isVertical() && !node.classList.contains('pinned');
+
 function animateIn(node) {
   if (reduceMotion.matches) return;
+  if (growsDown(node)) {
+    const height = node.getBoundingClientRect().height;
+    node.animate(
+      [
+        { height: '0px', minHeight: '0px', opacity: 0 },
+        { height: `${height}px`, minHeight: '0px', opacity: 1 },
+      ],
+      { duration: 220, easing: EASE },
+    );
+    return;
+  }
   const width = node.getBoundingClientRect().width;
   node.animate(
     [
@@ -212,6 +287,18 @@ function animateIn(node) {
 function animateOut(node) {
   node.classList.add('closing');
   if (reduceMotion.matches) return node.remove();
+  if (growsDown(node)) {
+    const height = node.getBoundingClientRect().height;
+    const animation = node.animate(
+      [
+        { height: `${height}px`, minHeight: '0px', opacity: 1 },
+        { height: '0px', minHeight: '0px', opacity: 0, marginTop: '0px', marginBottom: '0px' },
+      ],
+      { duration: 200, easing: EASE, fill: 'forwards' },
+    );
+    animation.onfinish = () => node.remove();
+    return;
+  }
   const width = node.getBoundingClientRect().width;
   const animation = node.animate(
     [
@@ -227,7 +314,7 @@ function renderTabs() {
   const existing = new Map(liveTabs().map((node) => [Number(node.dataset.id), node]));
   const added = [];
   const pinnedWidth = state.tabs.filter((t) => t.pinned).length * 46;
-  const narrow = state.tabs.filter((t) => !t.pinned).length * 110 > tabsEl.parentElement.clientWidth - 220 - pinnedWidth;
+  const narrow = !isVertical() && state.tabs.filter((t) => !t.pinned).length * 110 > roomForTabs() - pinnedWidth;
   const lastPinned = state.tabs.filter((t) => t.pinned).at(-1)?.id;
 
   animateLayout(() => {
@@ -276,6 +363,13 @@ function renderTabs() {
   firstRender = false;
 }
 
+/** How wide the tab strip can get, around the other things in its row. */
+function roomForTabs() {
+  if (tabLayout !== 'compact') return tabstrip.clientWidth - 220;
+  const others = [...tabstrip.children].filter((n) => n !== tabsEl && !n.classList.contains('drag-fill'));
+  return tabstrip.clientWidth - others.reduce((sum, n) => sum + n.offsetWidth + 4, 0) - 100;
+}
+
 function createTabNode(id) {
   const node = el('div', 'tab');
   node.dataset.id = id;
@@ -307,8 +401,15 @@ function createTabNode(id) {
 const DETACH_DISTANCE = 15; // Chromium's kVerticalDetachMagnetism
 let dragging = null;
 function startTabDrag(down, node, id) {
-  const grab = down.clientX - node.getBoundingClientRect().left;
   const pinned = node.classList.contains('pinned');
+  // On the side, tabs go down a column (pinned ones sit in a grid, side by side, unless collapsed).
+  const alongY = isVertical() && (!pinned || document.body.classList.contains('sidebar-collapsed'));
+  const pos = (e) => (alongY ? e.clientY : e.clientX);
+  const startOf = (r) => (alongY ? r.top : r.left);
+  const sizeOf = (r) => (alongY ? r.height : r.width);
+  const downRect = node.getBoundingClientRect();
+  const grab = pos(down) - startOf(downRect);
+  const stripEl = isVertical() ? sidebar : tabstrip;
   const group = () => liveTabs().filter((n) => n.classList.contains('pinned') === pinned);
   const startIndex = liveTabs().indexOf(node);
   let started = false;
@@ -316,12 +417,12 @@ function startTabDrag(down, node, id) {
   let minLeft = 0;
   let maxLeft = 0;
   const leftStrip = (e) => {
-    const strip = tabsEl.parentElement.getBoundingClientRect();
+    const strip = stripEl.getBoundingClientRect();
     return (
       e.clientY > strip.bottom + DETACH_DISTANCE ||
       e.clientY < strip.top - DETACH_DISTANCE ||
-      e.clientX < -DETACH_DISTANCE ||
-      e.clientX > window.innerWidth + DETACH_DISTANCE
+      e.clientX < strip.left - DETACH_DISTANCE ||
+      e.clientX > strip.right + DETACH_DISTANCE
     );
   };
   const onMove = (e) => {
@@ -333,7 +434,14 @@ function startTabDrag(down, node, id) {
       node.classList.remove('dragging');
       node.style.transform = '';
       dragging = null;
-      api.dragTabOut(id, { x: tabsEl.getBoundingClientRect().left + grab, y: down.clientY });
+      // Where the pointer will sit in the new window: over the tab, at the start of its strip.
+      const tabsRect = tabsEl.getBoundingClientRect();
+      api.dragTabOut(
+        id,
+        isVertical()
+          ? { x: down.clientX, y: tabsRect.top + (down.clientY - downRect.top) }
+          : { x: tabsRect.left + (down.clientX - downRect.left), y: down.clientY },
+      );
       return;
     }
     if (!started) {
@@ -344,18 +452,20 @@ function startTabDrag(down, node, id) {
       node.setPointerCapture?.(down.pointerId);
       // The group's span doesn't change while its tabs are reordered.
       const nodes = group();
-      minLeft = nodes[0].getBoundingClientRect().left;
-      maxLeft = nodes.at(-1).getBoundingClientRect().right - node.offsetWidth;
+      minLeft = startOf(nodes[0].getBoundingClientRect());
+      const lastRect = nodes.at(-1).getBoundingClientRect();
+      maxLeft = startOf(lastRect) + sizeOf(lastRect) - sizeOf(node.getBoundingClientRect());
     }
-    const left = Math.min(Math.max(e.clientX - grab, minLeft), Math.max(minLeft, maxLeft));
-    const center = left + node.offsetWidth / 2;
+    const size = sizeOf(node.getBoundingClientRect());
+    const left = Math.min(Math.max(pos(e) - grab, minLeft), Math.max(minLeft, maxLeft));
+    const center = left + size / 2;
     // Siblings glide out of the way instead of jumping.
     animateLayout(
       () => {
         for (const sibling of group()) {
           if (sibling === node) continue;
           const r = sibling.getBoundingClientRect();
-          const mid = r.left + r.width / 2;
+          const mid = startOf(r) + sizeOf(r) / 2;
           const isAfterNode = node.compareDocumentPosition(sibling) & Node.DOCUMENT_POSITION_FOLLOWING;
           // Inclusive, so pushing against either end of the group still
           // reaches the first or last slot.
@@ -370,7 +480,7 @@ function startTabDrag(down, node, id) {
       { except: node },
     );
     node.style.transform = '';
-    node.style.transform = `translateX(${left - node.getBoundingClientRect().left}px)`;
+    node.style.transform = `translate${alongY ? 'Y' : 'X'}(${left - startOf(node.getBoundingClientRect())}px)`;
   };
   const stop = () => {
     window.removeEventListener('pointermove', onMove);
@@ -490,9 +600,12 @@ $('forward').addEventListener('click', () => api.forward());
 reloadBtn.addEventListener('click', () => (reloadBtn.classList.contains('loading') ? api.stop() : api.reload()));
 starBtn.addEventListener('click', () => api.toggleBookmark());
 shieldBtn.addEventListener('click', () => api.toggleShield());
-$('tabstrip').addEventListener('dblclick', (e) => {
-  if (!e.target.closest('.tab, button')) api.newTab();
-});
+// Double click on empty space in the tab strip (or the side column) opens a tab.
+for (const strip of [tabstrip, sidebar]) {
+  strip.addEventListener('dblclick', (e) => {
+    if (e.target === strip || e.target === tabsEl || e.target.matches('.drag-fill, #sidebar-fill')) api.newTab();
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Address bar suggestions
@@ -556,7 +669,9 @@ function renderSuggestions(items, text) {
   selectSuggestion(0, { fill: false });
   if (openPopup !== suggestionsEl) {
     const r = addressForm.getBoundingClientRect();
-    showPopup(suggestionsEl, { left: `${r.left}px`, top: `${r.bottom + 6}px`, width: `${r.width}px` });
+    // In the compact layout the address bar is narrow: the list gets some more room.
+    const width = Math.min(Math.max(r.width, 460), window.innerWidth - r.left - 8);
+    showPopup(suggestionsEl, { left: `${r.left}px`, top: `${r.bottom + 6}px`, width: `${width}px` });
   }
 }
 
@@ -1037,6 +1152,7 @@ api.onDownloads((items) => {
 });
 api.onSettings((next) => {
   uiSettings = next;
+  applyLayout();
   renderBookmarks();
   renderToolbar();
 });
@@ -1055,4 +1171,12 @@ api.onUpdate((update) => {
 updateBtn.addEventListener('click', () => api.installUpdate());
 
 window.addEventListener('resize', renderTabs);
+// The window opens straight in the chosen layout (main passes it along), before the settings arrive.
+{
+  const query = new URLSearchParams(location.search);
+  uiSettings.tabLayout = query.get('layout') || 'classic';
+  uiSettings.verticalTabsCollapsed = query.get('collapsed') === '1';
+  applyLayout();
+}
+
 api.ready();

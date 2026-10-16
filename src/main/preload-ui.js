@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
 
   ready: send('ui:ready'),
   setChrome: send('ui:chrome'),
+  setLayoutSetting: send('ui:layout-setting'),
   newTab: send('tab:new'),
   closeTab: send('tab:close'),
   switchTab: send('tab:switch'),

@@ -1,0 +1,235 @@
+/*
+ * Tab layouts (Settings → "Layout das abas"; ui.js, applyLayout):
+ *   classic  — tabs on top, toolbar below (ui.css as is)
+ *   compact  — one row: navigation, address bar, tabs, buttons
+ *   vertical — toolbar on top, tabs in a column on the left
+ * The top row is 40px in every layout: the macOS traffic lights and the
+ * Windows caption buttons sit on it.
+ */
+
+/* Things that may end up in a draggable row */
+#address-form,
+.shield,
+.update-btn {
+  -webkit-app-region: no-drag;
+}
+
+/* ---- Compact ------------------------------------------------------------ */
+
+body.layout-compact #chrome {
+  background: var(--strip);
+}
+body.layout-compact #tabstrip {
+  align-items: center;
+}
+body.layout-compact #address-form {
+  flex: 0 1 380px;
+  min-width: 180px;
+  height: 30px;
+  margin: 0 8px 0 4px;
+  background: var(--tab-active);
+}
+body.layout-compact #address-form:focus-within {
+  background: var(--field-focus);
+}
+body.layout-compact #address-form:not(:focus-within) {
+  border-color: var(--line);
+  background: var(--field);
+}
+body.layout-compact #tabs {
+  height: 30px;
+  align-items: center;
+}
+body.layout-compact .tab {
+  height: 30px;
+  border-radius: 8px;
+}
+body.layout-compact .tab.active {
+  box-shadow: 0 0 0 1px var(--line);
+}
+body.layout-compact .tab.active::before,
+body.layout-compact .tab.active::after {
+  display: none;
+}
+body.layout-compact #new-tab {
+  margin-bottom: 0;
+}
+body.layout-compact .tab.pinned .tab-audio {
+  background: var(--strip);
+}
+body.layout-compact .tab.pinned.active .tab-audio {
+  background: var(--tab-active);
+}
+
+/* ---- Vertical tabs ------------------------------------------------------ */
+
+body.layout-vertical {
+  display: flex;
+  flex-direction: column;
+}
+body.layout-vertical #chrome {
+  flex: none;
+  background: var(--strip);
+}
+body.layout-vertical #toolbar {
+  height: 40px;
+  padding-left: 84px; /* the macOS traffic lights */
+  -webkit-app-region: drag;
+}
+body.layout-vertical.fullscreen #toolbar,
+body.layout-vertical.win #toolbar,
+body.layout-vertical.linux #toolbar {
+  padding-left: 8px;
+}
+body.layout-vertical.win #toolbar,
+body.layout-vertical.linux #toolbar {
+  padding-right: 140px; /* the Windows caption buttons */
+}
+body.layout-vertical #address-form {
+  height: 30px;
+  background: var(--tab-active);
+}
+body.layout-vertical #address-form:focus-within {
+  background: var(--field-focus);
+}
+body.layout-vertical #address-form:not(:focus-within) {
+  border-color: var(--line);
+  background: var(--field);
+}
+body.layout-vertical #private-badge {
+  margin: 0 2px;
+}
+
+#sidebar {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  border-right: 1px solid var(--line);
+  background: var(--strip);
+}
+body.sidebar-collapsed #sidebar {
+  width: 52px;
+}
+
+body.layout-vertical #tabs {
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 2px;
+  height: auto;
+  min-height: 0;
+  padding: 8px 6px 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+body.layout-vertical .tab {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 32px;
+  padding: 0 5px 0 9px;
+  border-radius: 8px;
+}
+body.layout-vertical .tab.active {
+  box-shadow: 0 0 0 1px var(--line);
+}
+body.layout-vertical .tab.active::before,
+body.layout-vertical .tab.active::after {
+  display: none;
+}
+body.layout-vertical .tab-title {
+  max-width: none;
+}
+/* Pinned tabs: a grid of icons above the list */
+body.layout-vertical .tab.pinned {
+  flex: 0 0 calc((100% - 6px) / 4);
+  width: auto;
+  min-width: 0;
+  height: 36px;
+  padding: 0;
+}
+body.layout-vertical .tab.last-pinned {
+  margin-right: 0;
+  margin-bottom: 6px;
+}
+body.layout-vertical .tab.pinned .tab-audio {
+  background: var(--strip);
+}
+body.layout-vertical .tab.pinned.active .tab-audio {
+  background: var(--tab-active);
+}
+
+body.layout-vertical #new-tab {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex: none;
+  width: auto;
+  height: 32px;
+  margin: 2px 6px 0;
+  padding: 0 9px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+body.layout-vertical #new-tab::after {
+  content: 'Nova aba';
+  font-size: 13px;
+}
+
+#sidebar-fill {
+  flex: 1;
+  min-height: 12px;
+}
+#sidebar-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 11px 8px;
+}
+
+/* Collapsed: just the icons */
+body.sidebar-collapsed .tab,
+body.sidebar-collapsed .tab.pinned {
+  flex: 0 0 100%;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+}
+body.sidebar-collapsed .tab.pinned {
+  height: 32px;
+}
+body.sidebar-collapsed .tab-title,
+body.sidebar-collapsed .tab-close {
+  display: none;
+}
+body.sidebar-collapsed .tab .tab-audio {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 16px;
+  height: 16px;
+  background: var(--strip);
+}
+body.sidebar-collapsed .tab.active .tab-audio {
+  background: var(--tab-active);
+}
+body.sidebar-collapsed .tab .tab-audio svg {
+  width: 11px;
+  height: 11px;
+}
+body.sidebar-collapsed #new-tab {
+  justify-content: center;
+  padding: 0;
+}
+body.sidebar-collapsed #new-tab::after {
+  display: none;
+}
+body.sidebar-collapsed #sidebar-foot {
+  justify-content: center;
+  padding-inline: 0;
+}
+body.sidebar-collapsed #sidebar-collapse svg {
+  transform: scaleX(-1);
+}

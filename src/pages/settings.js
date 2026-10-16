@@ -77,6 +77,7 @@ function render(s) {
     }),
   );
   dns.value = s.values.secureDns;
+  $('tab-layout').value = s.values.tabLayout;
 
   const ago = (t) => {
     if (!t) return 'nunca';
@@ -152,6 +153,7 @@ $('make-default').addEventListener('click', async () => {
   setTimeout(async () => render(await settings.get()), 4000);
 });
 $('dns').addEventListener('change', async (e) => render(await settings.set('secureDns', e.target.value)));
+$('tab-layout').addEventListener('change', async (e) => render(await settings.set('tabLayout', e.target.value)));
 $('update-lists').addEventListener('click', async (e) => {
   e.target.disabled = true;
   $('lists-status').textContent = 'Atualizando…';

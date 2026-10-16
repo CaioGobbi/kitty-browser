@@ -5,6 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src * data:; style-src 'self'" />
     <title>Kitty</title>
     <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="layouts.css" />
     <link rel="stylesheet" href="siteinfo.css" />
   </head>
   <body>
@@ -99,6 +100,16 @@
         </button>
       </div>
     </div>
+
+    <!-- Vertical tabs: the tab list moves here (ui.js, applyLayout) -->
+    <aside id="sidebar" hidden>
+      <div id="sidebar-fill"></div>
+      <div id="sidebar-foot">
+        <button id="sidebar-collapse" class="icon-btn" title="Recolher abas" aria-label="Recolher abas">
+          <svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="2" /><path d="M6.5 3v10" /></svg>
+        </button>
+      </div>
+    </aside>
 
     <div id="scrim" hidden></div>
     <div id="suggestions" class="popup" role="listbox" hidden></div>

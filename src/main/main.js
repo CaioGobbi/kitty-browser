@@ -352,8 +352,18 @@ function settingsSnapshot() {
 function uiSettings() {
   return {
     showBookmarksBar: data.settings.get('showBookmarksBar'),
+    tabLayout: data.settings.get('tabLayout'),
+    verticalTabsCollapsed: data.settings.get('verticalTabsCollapsed'),
     engineName: engine().name,
   };
+}
+
+/** Layout settings the browser UI and the menus change themselves. */
+function setLayoutSetting(key, value) {
+  if (!['tabLayout', 'verticalTabsCollapsed'].includes(key) || !EDITABLE_SETTINGS[key](value)) return;
+  data.settings.set(key, value);
+  broadcastSettings();
+  if (key === 'tabLayout') menus.buildAppMenu();
 }
 
 function broadcastSettings() {
@@ -398,6 +408,7 @@ function registerIpc() {
   });
   ui('update:install', () => updater.install());
   ui('ui:chrome', (w, layout) => w.setChrome(layout || {}));
+  ui('ui:layout-setting', (_w, key, value) => setLayoutSetting(key, value));
   ui('tab:new', (w) => w.createTab());
   ui('tab:close', (w, id) => w.closeTab(id ?? w.activeId));
   ui('tab:switch', (w, id) => w.switchTab(id));
@@ -526,6 +537,7 @@ function registerIpc() {
     if (!fromPage(event, 'settings') || !EDITABLE_SETTINGS[key]?.(value)) return settingsSnapshot();
     data.settings.set(key, value);
     if (key === 'secureDns') applyDns();
+    if (key === 'tabLayout') menus.buildAppMenu();
     if (key === 'autoUpdateLists' && value) lists.refresh();
     if (key === 'widevine') setupWidevine(allowed('widevine'));
     broadcastSettings();
@@ -674,6 +686,7 @@ app.whenReady().then(async () => {
     toggleBookmark,
     editBookmarks,
     bookmarkDialog,
+    setTabLayout: (layout) => setLayoutSetting('tabLayout', layout),
     toggleBookmarksBar: () => {
       data.settings.set('showBookmarksBar', !data.settings.get('showBookmarksBar'));
       broadcastSettings();
