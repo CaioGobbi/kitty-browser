@@ -1,6 +1,6 @@
 'use strict';
 
-// Filter lists: ads/trackers (Ghostery's EasyList/EasyPrivacy bundle) and
+// Filter lists: ads/trackers (uBlock Origin's default set) and
 // dangerous sites (phishing and malware). A copy ships inside the app
 // (src/lists, made by scripts/build-lists.js), so blocking works offline from
 // the first launch. Newer versions are downloaded only once the person allows
@@ -23,6 +23,63 @@ const THREAT_LISTS = {
   ],
 };
 
+/**
+ * The same ad/tracker lists uBlock Origin turns on by default, from their own
+ * sites. Ghostery's library has the set built in, but from a mirror that lags
+ * weeks behind (quick-fixes.txt, where uBlock posts its fixes for YouTube and
+ * other sites, was 2 months old), so it's only the fallback for a list whose
+ * site can't be reached.
+ */
+const UBO = 'https://ublockorigin.github.io/uAssets/filters';
+const GHOSTERY = 'https://raw.githubusercontent.com/ghostery/adblocker/master/packages/adblocker/assets';
+const AD_LISTS = [
+  ['https://easylist.to/easylist/easylist.txt', 'easylist/easylist.txt'],
+  ['https://easylist.to/easylist/easyprivacy.txt', 'easylist/easyprivacy.txt'],
+  ['https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext', 'peter-lowe/serverlist.txt'],
+  [`${UBO}/filters.txt`, 'ublock-origin/filters.txt'],
+  [`${UBO}/privacy.txt`, 'ublock-origin/privacy.txt'],
+  [`${UBO}/quick-fixes.txt`, 'ublock-origin/quick-fixes.txt'],
+  [`${UBO}/unbreak.txt`, 'ublock-origin/unbreak.txt'],
+  [`${UBO}/badware.txt`, 'ublock-origin/badware.txt'],
+];
+
+async function fetchText(url) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  return res.text();
+}
+
+/**
+ * uBlock's filters.txt is split in parts joined by "!#include <file>" lines
+ * (filters-2020.txt … filters-2026.txt and others); Ghostery's engine doesn't
+ * follow them, so they're replaced by the files' contents.
+ */
+async function withIncludes(url, text, depth = 0) {
+  const parts = text.split(/^!#include +(\S+)\s*$/m);
+  if (parts.length === 1 || depth > 2) return text;
+  for (let i = 1; i < parts.length; i += 2) {
+    const child = new URL(parts[i], url).href;
+    parts[i] = await withIncludes(child, await fetchText(child), depth + 1);
+  }
+  return parts.join('\n');
+}
+
+async function adList([url, mirror]) {
+  try {
+    return await withIncludes(url, await fetchText(url));
+  } catch (err) {
+    console.error(`[kitty] ${err.message}; usando a cópia do Ghostery.`);
+    return fetchText(`${GHOSTERY}/${mirror}`);
+  }
+}
+
+async function buildAds() {
+  const [texts, resources] = await Promise.all([Promise.all(AD_LISTS.map(adList)), fetchText(`${GHOSTERY}/ublock-origin/resources.json`)]);
+  const engine = ElectronBlocker.parse(texts.join('\n'));
+  engine.updateResources(resources, String(resources.length));
+  return engine;
+}
+
 const lists = {
   ads: { engine: null, file: 'adblock-engine.bin', maxAge: 24 * HOUR, updated: null },
   phishing: { engine: null, file: `phishing-engine.v${THREAT_FORMAT}.bin`, maxAge: 6 * HOUR, updated: null },
@@ -38,14 +95,8 @@ let mayUpdate = () => false;
 const cachePath = (list) => path.join(app.getPath('userData'), list.file);
 
 async function build(name) {
-  if (name === 'ads') return ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
-  const texts = await Promise.all(
-    THREAT_LISTS[name].map(async (url) => {
-      const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
-      if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-      return res.text();
-    }),
-  );
+  if (name === 'ads') return buildAds();
+  const texts = await Promise.all(THREAT_LISTS[name].map(fetchText));
   return FiltersEngine.parse(texts.map(anchorHostnames).join('\n'), { loadCosmeticFilters: false, enableHtmlFiltering: false });
 }
 
