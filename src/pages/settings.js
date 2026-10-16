@@ -174,32 +174,57 @@ $('clear').addEventListener('click', async () => {
 });
 
 // ---- Import from another browser
+// Browsers that macOS keeps Kitty out of still show up in the list, marked, so
+// picking one leads to the permission instead of an empty list.
+const BLOCKED = 'blocked:';
+const PRIVACY_PATH = 'Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco';
+
 async function loadImportSources() {
   const { sources, blocked } = await settings.importSources();
   const select = $('import-source');
+  const previous = select.value;
+  const option = (value, text) => {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = text;
+    return o;
+  };
   select.replaceChildren(
-    ...sources.map((s) => {
-      const option = document.createElement('option');
-      option.value = s.id;
-      option.textContent = s.name;
-      return option;
-    }),
+    ...sources.map((s) => option(s.id, s.name)),
+    ...blocked.map((name) => option(BLOCKED + name, `🔒 ${name}`)),
   );
-  select.disabled = $('import').disabled = sources.length === 0;
-  if (!sources.length) {
-    $('import-hint').textContent = blocked.length
-      ? 'O macOS não deixou o Kitty ler os dados dos outros navegadores.'
+  if ([...select.options].some((o) => o.value === previous)) select.value = previous;
+  select.disabled = sources.length + blocked.length === 0;
+  $('import-hint').textContent =
+    sources.length || blocked.length
+      ? 'Traz favoritos e histórico salvos no computador. Nada é enviado pela internet.'
       : 'Nenhum outro navegador encontrado neste computador.';
-  }
-  $('import-blocked').hidden = blocked.length === 0;
-  $('import-blocked-text').textContent =
-    `Para importar do ${blocked.join(', ').replace(/, ([^,]*)$/, ' e $1')}, ative o Kitty em ` +
-    'Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco e reabra o Kitty.';
+  updateImportChoice();
 }
 
-$('import-privacy').addEventListener('click', () => settings.importOpenPrivacy());
+function updateImportChoice() {
+  const value = $('import-source').value;
+  const blockedName = value.startsWith(BLOCKED) ? value.slice(BLOCKED.length) : null;
+  $('import-blocked').hidden = !blockedName;
+  if (blockedName) {
+    $('import-blocked-text').textContent =
+      `O macOS não deixa o Kitty ler os dados do ${blockedName}. Para liberar, ative o Kitty em ` +
+      `${PRIVACY_PATH} e volte para esta tela. Se o Kitty já estiver na lista, apague-o com o botão − e ` +
+      'adicione de novo com o +: o macOS esquece a permissão quando o Kitty é atualizado.';
+  }
+  $('import').textContent = blockedName ? 'Dar permissão' : 'Importar';
+  $('import').disabled = !value;
+}
+
+$('import-source').addEventListener('change', () => {
+  $('import-status').textContent = '';
+  updateImportChoice();
+});
+// After granting the permission in System Settings, the browser shows up as soon as Kitty is back.
+window.addEventListener('focus', loadImportSources);
 
 $('import').addEventListener('click', async (e) => {
+  if ($('import-source').value.startsWith(BLOCKED)) return settings.importOpenPrivacy();
   const kinds = [...document.querySelectorAll('#importar .checks input:checked')].map((i) => i.value);
   if (!kinds.length) return;
   const status = $('import-status');
