@@ -1,3 +1,5 @@
+<a href="https://buymeacoffee.com/caiogobbii"><img align="right" src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40"></a>
+
 # 🐱 Kitty
 
 Um navegador rápido e focado em privacidade, construído sobre o Chromium (via Electron), na mesma linha do Brave. Bloqueia anúncios e rastreadores, protege contra fingerprinting e phishing e não manda nenhum dado seu para ninguém: não há conta, telemetria nem servidor do Kitty.
