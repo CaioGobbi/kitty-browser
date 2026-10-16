@@ -31,4 +31,5 @@ fi
 gh release view "$TAG" --repo "$REPO" > /dev/null
 gh release upload "$TAG" --repo "$REPO" --clobber "$OUT"/Kitty-"$VERSION"-linux-*.AppImage "$OUT"/Kitty-"$VERSION"-linux-*.deb
 ls "$OUT"/Kitty-"$VERSION"-linux-*.rpm > /dev/null 2>&1 && gh release upload "$TAG" --repo "$REPO" --clobber "$OUT"/Kitty-"$VERSION"-linux-*.rpm
+sh scripts/release-notes.sh
 echo "Publicado: https://github.com/$REPO/releases/tag/$TAG"

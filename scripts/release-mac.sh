@@ -40,4 +40,5 @@ gh release view "$TAG" --repo "$REPO" > /dev/null
 gh release upload "$TAG" --repo "$REPO" --clobber "$DMG" "$ZIP"
 # Last, so no installed Kitty sees the version before its .zip is there.
 gh release upload "$TAG" --repo "$REPO" --clobber out/latest-mac.yml
+sh scripts/release-notes.sh
 echo "Publicado: https://github.com/$REPO/releases/tag/$TAG"

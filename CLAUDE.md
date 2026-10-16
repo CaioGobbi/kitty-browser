@@ -82,13 +82,15 @@ Para testar sem mexer no perfil real: `KITTY_PROFILE=<pasta> npx electron . --in
 ## Como publicar uma versão
 
 1. Cada release chega a todos os Kitty instalados no Windows, então só publique o que já foi testado.
-2. Subir `version` no `package.json` e commitar ("Versão X.Y.Z: …").
+2. Subir `version` no `package.json`, escrever as novidades em inglês em `docs/releases/X.Y.Z.md` e commitar ("Versão X.Y.Z: …").
 3. `npm run release:win` (precisa de `gh auth login`). O script gera o instalador, dá push, cria o release `vX.Y.Z` e envia `.exe`, `.blockmap` e por último `latest.yml`, para ninguém ver a versão antes do instalador estar lá.
 4. `npm run release:mac`: gera o `Kitty.app`, empacota em `out/Kitty-X.Y.Z-mac-arm64.dmg` (primeira instalação) e `.zip` (atualização) e anexa ao mesmo release, com o `latest-mac.yml` por último. Recusa sair sem a assinatura "Kitty Local", porque os Mac instalados recusariam a atualização.
    - Depois, `npm run release:linux` (precisa do Docker Desktop aberto para o `.rpm`). Os dois recusam rodar com alterações sem commit.
    - Se a pasta tiver trabalho em andamento de outra pessoa, gere numa cópia limpa: `git worktree add --detach <pasta> <commit>`, copie `node_modules` (`cp -Rc`) e ligue `.venv` com um link simbólico (sem ele o Windows sai sem VMP, só com um aviso). Como o worktree fica sem branch, faça o push do `main` e os passos do `gh release` à mão, na ordem dos scripts.
 5. No Mac, `npm run install-app` atualiza o app local.
 6. Atualizar este arquivo (versão atual e histórico).
+
+Notas do release: o GitHub não agrupa a lista de arquivos, então cada script de release termina com `scripts/release-notes.sh`, que reescreve as notas com as novidades (`docs/releases/X.Y.Z.md`, se existir) e uma seção de downloads por sistema (Windows, macOS, Linux) com links diretos só para os arquivos já anexados. Dá para rodar sozinho (`sh scripts/release-notes.sh [versão]`). O README é em inglês.
 
 Cuidados de build: no packager, `--asar-integrity-digest=false` é obrigatório (senão a Castlabs recusa a assinatura VMP); no Mac a VMP vem antes da assinatura da Apple, no Windows depois; sem conta Castlabs EVS configurada os scripts só avisam e o app sai sem VMP. No Mac, `scripts/sign-mac.sh` assina com o certificado autoassinado "Kitty Local" (Keychain de login do Mac do dono, válido até 2036), para o macOS manter permissões como o Acesso Total ao Disco entre versões, inclusive para quem instala pelo DMG. Todas as builds e releases de Mac devem sair com ele: **não recrie o certificado** (um novo faz a permissão cair para todo mundo e quebra a atualização automática: os Mac instalados recusam o app novo e é preciso baixar o DMG à mão). Sem ele na máquina, o script avisa e cai para ad-hoc.
 

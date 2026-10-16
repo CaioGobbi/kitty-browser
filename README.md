@@ -1,103 +1,111 @@
 <div align="center">
-    <img src="assets/icon.png" title="Kitty" alt="Ícone do Kitty" width="128" />
+    <img src="assets/icon.png" title="Kitty" alt="Kitty icon" width="128" />
     <h1>Kitty</h1>
     <p>
-        O navegador rápido, bonito e focado em privacidade.
+        The fast, good-looking, privacy-focused browser.
     </p>
-    <a href="https://github.com/CaioGobbi/kitty-browser/releases/latest">Baixar</a>
+    <a href="https://github.com/CaioGobbi/kitty-browser/releases/latest">Download</a>
     ·
-    <a href="#o-que-já-tem">Recursos</a>
+    <a href="#features">Features</a>
     ·
-    <a href="#compilar">Compilar</a>
+    <a href="#building">Building</a>
     <br /><br />
     <a href="https://buymeacoffee.com/caiogobbii"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40" /></a>
 </div>
 
 <br />
 
-O Kitty é construído sobre o Chromium (via Electron), na mesma linha do Brave. Ele bloqueia anúncios e rastreadores, protege contra fingerprinting e phishing e não manda nenhum dado seu para ninguém: não há conta, telemetria nem servidor do Kitty.
+Kitty is built on Chromium (through Electron), in the same spirit as Brave. It blocks ads and trackers, protects you against fingerprinting and phishing, and sends none of your data anywhere: there's no account, no telemetry and no Kitty server.
 
-![Nova aba do Kitty](docs/screenshots/nova-aba.png)
+It runs on Windows, macOS and Linux.
 
-![Configurações de privacidade do Kitty](docs/screenshots/privacidade.png)
+![Kitty's new tab](docs/screenshots/nova-aba.png)
 
-## Baixar
+![Kitty's privacy settings](docs/screenshots/privacidade.png)
+
+## Download
 > [!NOTE]
-> O Kitty ainda está no começo, então algo pode não funcionar como esperado.
-> Se encontrar um problema, [abra uma issue](https://github.com/CaioGobbi/kitty-browser/issues).
+> Kitty is still young, so some things may not work as expected.
+> If you run into a problem, please [open an issue](https://github.com/CaioGobbi/kitty-browser/issues).
 
-As versões ficam no [GitHub Releases](https://github.com/CaioGobbi/kitty-browser/releases/latest):
+Every version is on [GitHub Releases](https://github.com/CaioGobbi/kitty-browser/releases/latest), with the files grouped by system:
 
-- **Windows 10/11 (64 bits):** `Kitty-Setup-*.exe`. O Kitty se atualiza sozinho depois de instalado.
-- **macOS (Apple Silicon, M1 ou mais novo):** `Kitty-*-mac-arm64.dmg`. Abra e arraste o Kitty para a pasta Aplicativos. A partir da 0.3.3 ele se atualiza sozinho; quem tem uma versão anterior precisa baixar o DMG da versão nova uma vez.
-- **Linux (64 bits):** instale com uma linha no terminal, que baixa a versão mais nova (rode de novo para atualizar):
+- **Windows 10/11 (64-bit):** `Kitty-Setup-*.exe`. Kitty updates itself once installed.
+- **macOS (Apple Silicon, M1 or newer):** `Kitty-*-mac-arm64.dmg`. Open it and drag Kitty to Applications. Since 0.3.3 it updates itself; if you have an older version, download the new DMG once.
+- **Linux (64-bit):** install it with one line in the terminal, which downloads the latest version (run it again to update):
 
   ```bash
   curl -fsSL https://raw.githubusercontent.com/CaioGobbi/kitty-browser/main/install.sh | sh
   ```
 
-  No Debian, Ubuntu e derivados ele instala o `.deb`; no Fedora e no openSUSE, o `.rpm`; nas outras distribuições, o `.AppImage` em `~/.local/bin` (precisa da biblioteca FUSE 2). Os três arquivos também ficam no Releases, para instalar à mão. O comando é `kitty-browser`, para não confundir com o terminal kitty.
+  On Debian, Ubuntu and derivatives it installs the `.deb`; on Fedora and openSUSE, the `.rpm`; on other distributions, the `.AppImage` in `~/.local/bin` (needs the FUSE 2 library). All three files are also on Releases if you'd rather install by hand. The command is `kitty-browser`, so it doesn't clash with the kitty terminal.
 
 > [!WARNING]
-> O Kitty ainda não tem assinatura digital da Microsoft nem da Apple, então o sistema avisa na primeira vez.
-> - **Windows:** no aviso do SmartScreen, clique em **Mais informações → Executar assim mesmo**.
-> - **Mac:** abra o Kitty uma vez e feche o aviso, vá em **Ajustes do Sistema → Privacidade e Segurança**, role até o fim e clique em **Abrir Mesmo Assim**. Depois disso ele abre normalmente.
+> Kitty isn't signed by Microsoft or Apple yet, so your system will warn you the first time.
+> - **Windows:** on the SmartScreen warning, click **More info → Run anyway**.
+> - **Mac:** open Kitty once and dismiss the warning, go to **System Settings → Privacy & Security**, scroll to the bottom and click **Open Anyway**. After that it opens normally.
 
-No Windows, o instalador instala só para o usuário atual (sem pedir administrador), cria atalhos na área de trabalho e no menu Iniciar e registra o Kitty como navegador, para ele aparecer em Configurações → Apps → Aplicativos padrão. Ao desinstalar, tudo isso é removido, e seus dados ficam em `%APPDATA%\Kitty`.
+On Windows, the installer installs for the current user only (no administrator needed), creates shortcuts on the desktop and in the Start menu, and registers Kitty as a browser so it shows up in Settings → Apps → Default apps. Uninstalling removes all of that, and your data stays in `%APPDATA%\Kitty`.
 
-## O que já tem
+## Features
 
-**Privacidade**
-- **Escudos**: bloqueio de anúncios e rastreadores (EasyList/EasyPrivacy) com filtros cosméticos, por site. No YouTube, os anúncios são silenciados, acelerados e pulados na hora, sem mexer nos dados do player
-- **Janela privativa** (`⇧⌘N`): nada fica salvo, e tudo some ao fechar
-- **HTTPS automático**, com volta para HTTP só quando o site não suporta
-- **Cookies de terceiros bloqueados**, inclusive os criados por scripts dentro de iframes
-- **Proteção contra sites perigosos**: avisa antes de abrir phishing e malware (listas malware-filter, URLhaus e uBlock Origin), verificando tudo localmente
-- **Links sem rastreadores**: remove `utm_*`, `fbclid`, `gclid` e similares antes de abrir
-- **DNS seguro** (DNS over HTTPS) com Quad9, Cloudflare ou Mullvad
-- **User-Agent igual ao do Chrome**, sem revelar Electron nem Kitty
-- **Proteção contra fingerprinting**: ruído por site em canvas, WebGL, áudio, medição de fontes, tela, hardware e workers, no estilo do Brave
-- **WebRTC** não expõe endereços da rede local
-- Listas de bloqueio **atualizadas sozinhas** (anúncios a cada 24 h, ameaças a cada 6 h)
-- **Permissões de sites**: câmera, microfone, localização e notificações só com o seu OK
-- **Global Privacy Control** (`Sec-GPC` e `navigator.globalPrivacyControl`)
+**Privacy**
+- **Shields**: ad and tracker blocking with the same lists uBlock Origin enables by default (EasyList, EasyPrivacy, Peter Lowe's and uBlock's own), including cosmetic filters, adjustable per site. On YouTube, ads are muted, sped up and skipped right away, without touching the player's data
+- **Private window** (`⇧⌘N`): nothing is saved, and everything is gone when you close it
+- **Automatic HTTPS**, falling back to HTTP only when the site doesn't support it
+- **Third-party cookies blocked**, including those set by scripts inside iframes
+- **Dangerous site protection**: warns you before opening phishing and malware (malware-filter, URLhaus and uBlock Origin lists), all checked locally
+- **Tracker-free links**: strips `utm_*`, `fbclid`, `gclid` and the like before opening
+- **Secure DNS** (DNS over HTTPS) with Quad9, Cloudflare or Mullvad
+- **Same User-Agent as Chrome**, without revealing Electron or Kitty
+- **Fingerprinting protection**: per-site noise in canvas, WebGL, audio, font measurement, screen, hardware and workers, Brave-style, and it can be turned off for a single site
+- **WebRTC** doesn't expose local network addresses
+- **No connections before you say so**: on first launch, a welcome screen asks which automatic connections to allow (list updates, app updates, Widevine) before Kitty connects to anything
+- Block lists **update automatically** (ads every 24 h, threats every 6 h)
+- **Site permissions**: camera, microphone, location and notifications only with your OK, editable per site
+- **Global Privacy Control** (`Sec-GPC` and `navigator.globalPrivacyControl`)
 
-**Navegação**
-- Abas: fixar, arrastar para reordenar, silenciar, duplicar, fechar outras, reabrir fechada (`⇧⌘T`), botão do meio fecha
-- Gestos: deslize dois dedos no trackpad para voltar/avançar (ou três, se o Mac estiver configurado assim) e botões laterais do mouse
-- Barra de endereço com sugestões do histórico, dos favoritos e do buscador
-- Favoritos com barra (`⇧⌘B`) e página de gerenciamento
-- Importa favoritos e histórico do Chrome, Brave, Edge e Firefox
-- Acesso rápido na nova aba, com os ícones dos sites
-- Busca na página (`⌘F`), tela cheia de vídeo, zoom, imprimir, salvar página, ver código-fonte
-- Menu de botão direito completo (links, imagens, texto, corretor ortográfico, inspecionar)
-- Downloads direto na pasta Downloads, com painel de progresso, pausar e cancelar
-- Restaura as abas ao reabrir; janelas múltiplas; pode ser o navegador padrão
-- Buscadores: DuckDuckGo, Brave Search, Startpage, Ecosia ou Google
-- Vídeos com DRM via Widevine (Castlabs), com assinatura VMP: Crunchyroll, Netflix e outros serviços de streaming funcionam
+**Browsing**
+- Tabs: pin, drag to reorder, drag out into a new window (or into another window), mute, duplicate, close others, reopen closed (`⇧⌘T`), middle-click to close
+- Three tab layouts: classic, compact (everything on one line) and vertical tabs
+- Light, dark or automatic theme
+- Interface in English or Portuguese (Brazil)
+- Gestures: swipe two fingers on the trackpad to go back/forward (or three, if your Mac is set up that way) and the mouse side buttons
+- Address bar with suggestions from history, bookmarks and the search engine
+- Bookmarks with folders, an editable bookmarks bar (`⇧⌘B`) and a management page
+- Local password manager: offers to save logins and fills them in, with no sync and no account
+- Chrome extensions, installed straight from the Chrome Web Store
+- Imports bookmarks and history from Chrome, Brave, Edge, Vivaldi, Opera, Arc and Firefox
+- Speed dial on the new tab, with site icons
+- Find in page (`⌘F`), video fullscreen, zoom, print, save page, view source
+- Full right-click menu (links, images, text, spell check, inspect)
+- Downloads straight to your Downloads folder, with a progress panel, pause and cancel
+- Restores your tabs on relaunch; multiple windows; can be the default browser
+- Search engines: DuckDuckGo, Brave Search, Startpage, Ecosia or Google
+- DRM video through Widevine (Castlabs), with VMP signing: Crunchyroll, Netflix and other streaming services work
 
-Tudo isso pode ser ajustado em `kitty://settings` (`⌘,`).
+Everything can be adjusted in `kitty://settings` (`⌘,`).
 
-## Atalhos
+## Shortcuts
 
-| Ação | Mac | Windows |
+| Action | Mac | Windows / Linux |
 | --- | --- | --- |
-| Nova aba / janela / janela privativa | `⌘T` / `⌘N` / `⇧⌘N` | `Ctrl+T` / `Ctrl+N` / `Ctrl+Shift+N` |
-| Fechar aba / reabrir fechada | `⌘W` / `⇧⌘T` | `Ctrl+W` / `Ctrl+Shift+T` |
-| Barra de endereço | `⌘L` | `Ctrl+L` |
-| Buscar na página | `⌘F` (`⌘G` próxima) | `Ctrl+F` (`Ctrl+G` próxima) |
-| Favoritar / barra de favoritos | `⌘D` / `⇧⌘B` | `Ctrl+D` / `Ctrl+Shift+B` |
-| Histórico / downloads | `⌘Y` / `⇧⌘J` | `Ctrl+H` / `Ctrl+J` |
-| Configurações | `⌘,` | `Ctrl+,` |
-| Voltar / Avançar | `⌘[` / `⌘]` | `Alt+←` / `Alt+→` |
-| Recarregar (sem cache) | `⌘R` (`⇧⌘R`) | `F5` (`Ctrl+F5`) |
-| Ferramentas do desenvolvedor | `⌥⌘I` | `F12` |
+| New tab / window / private window | `⌘T` / `⌘N` / `⇧⌘N` | `Ctrl+T` / `Ctrl+N` / `Ctrl+Shift+N` |
+| Close tab / reopen closed | `⌘W` / `⇧⌘T` | `Ctrl+W` / `Ctrl+Shift+T` |
+| Address bar | `⌘L` | `Ctrl+L` |
+| Find in page | `⌘F` (`⌘G` next) | `Ctrl+F` (`Ctrl+G` next) |
+| Bookmark / bookmarks bar | `⌘D` / `⇧⌘B` | `Ctrl+D` / `Ctrl+Shift+B` |
+| History / downloads | `⌘Y` / `⇧⌘J` | `Ctrl+H` / `Ctrl+J` |
+| Settings | `⌘,` | `Ctrl+,` |
+| Back / Forward | `⌘[` / `⌘]` | `Alt+←` / `Alt+→` |
+| Reload (bypass cache) | `⌘R` (`⇧⌘R`) | `F5` (`Ctrl+F5`) |
+| Developer tools | `⌥⌘I` | `F12` |
 
-No Windows também valem `F11` (tela cheia) e `Ctrl+Tab`/`Ctrl+PageDown` para trocar de aba.
+On Windows and Linux, `F11` (fullscreen) and `Ctrl+Tab`/`Ctrl+PageDown` to switch tabs also work.
 
-## Compilar
+## Building
 
-Você precisa do [Node.js](https://nodejs.org) (versão atual) e do git.
+You need [Node.js](https://nodejs.org) (current version) and git.
 
 ```bash
 git clone https://github.com/CaioGobbi/kitty-browser.git
@@ -106,37 +114,37 @@ npm install
 npm start
 ```
 
-O `npm install` baixa o Electron da Castlabs (Chromium com Widevine). Para testar sem mexer no seu perfil: `KITTY_PROFILE=/tmp/kitty-teste npm start`.
+`npm install` downloads Castlabs' Electron (Chromium with Widevine). To test without touching your profile: `KITTY_PROFILE=/tmp/kitty-test npm start`.
 
-### Compilar no Mac
+### Building on a Mac
 
-Precisa de um Mac com Apple Silicon e das ferramentas de linha de comando do Xcode (`xcode-select --install`), usadas para compilar o módulo nativo dos gestos de trackpad.
+You need a Mac with Apple Silicon and the Xcode command line tools (`xcode-select --install`), used to build the native module for trackpad gestures.
 
 ```bash
 npm run install-app
 ```
 
-Gera o `Kitty.app`, assina localmente e copia para `/Applications`. Para só gerar o app em `out/`, use `npm run dist`. Para regerar o ícone a partir de `assets/icon.svg`, use `npm run icon`.
+This builds `Kitty.app`, signs it locally and copies it to `/Applications`. To only build the app into `out/`, use `npm run dist`. To regenerate the icon from `assets/icon.svg`, use `npm run icon`.
 
-### Gerar o instalador para Windows
+### Building the Windows installer
 
 ```bash
 npm run dist:win
 ```
 
-Gera `out/windows/Kitty-Setup-<versão>.exe` (Windows 10/11, 64 bits); dá para gerar direto do Mac.
+This builds `out/windows/Kitty-Setup-<version>.exe` (Windows 10/11, 64-bit); you can build it straight from a Mac.
 
-### Gerar os pacotes para Linux
+### Building the Linux packages
 
 ```bash
 npm run dist:linux
 ```
 
-Gera em `out/linux/` o `.AppImage` e o `.deb` (x64); dá para gerar direto do Mac. O `.rpm` precisa do `rpmbuild`, então o `npm run release:linux` o gera num container Docker.
+This builds the `.AppImage` and `.deb` (x64) into `out/linux/`; you can build them straight from a Mac. The `.rpm` needs `rpmbuild`, so `npm run release:linux` builds it in a Docker container.
 
-### Crunchyroll, Netflix e outros com DRM
+### Crunchyroll, Netflix and other DRM services
 
-Esses serviços só liberam a licença do vídeo (Widevine) para apps com assinatura **VMP**, que a Castlabs emite de graça pelo serviço EVS. As versões publicadas do Kitty já vêm assinadas. Sem a assinatura o Kitty funciona normalmente, só esses vídeos não tocam. Para assinar os seus próprios builds, crie uma conta EVS uma vez:
+These services only release the video license (Widevine) to apps with a **VMP** signature, which Castlabs issues for free through its EVS service. Published Kitty versions are already signed. Without the signature Kitty works normally; only those videos won't play. To sign your own builds, create an EVS account once:
 
 ```bash
 python3 -m venv .venv
@@ -144,46 +152,49 @@ python3 -m venv .venv
 npm run evs-signup
 ```
 
-Depois disso, `npm run dist` (Mac) e `npm run dist:win` (Windows) assinam sozinhos. No Mac a assinatura VMP é feita antes da assinatura da Apple; no Windows, depois.
+After that, `npm run dist` (Mac) and `npm run dist:win` (Windows) sign automatically. On the Mac the VMP signature is applied before Apple's code signature; on Windows, after.
 
-### Publicar uma versão (mantenedores)
+### Publishing a version (maintainers)
 
-Suba a versão no `package.json`, faça o commit e rode `npm run release:win` (precisa do `gh auth login`). O script gera o instalador e cria a versão no GitHub Releases, de onde os Kitty instalados no Windows se atualizam sozinhos. Depois rode `npm run release:mac`, que gera o DMG e a atualização do Mac e anexa na mesma versão, e `npm run release:linux`, que faz o mesmo com os pacotes do Linux (o código precisa estar sem alterações pendentes).
+Bump the version in `package.json`, optionally describe the changes in `docs/releases/<version>.md`, commit, and run `npm run release:win` (needs `gh auth login`). The script builds the installer and creates the release on GitHub, from which installed copies of Kitty on Windows update themselves. Then run `npm run release:mac`, which builds the Mac DMG and update and attaches them to the same release, and `npm run release:linux`, which does the same with the Linux packages (the code must have no uncommitted changes). Each script rewrites the release notes with the changes and a download section per system, linking to the files attached so far (`scripts/release-notes.sh`).
 
-## Estrutura
+## Project layout
 
 ```
-src/main/   processo principal
-  main.js        inicialização, IPC, favoritos, sugestões, configurações
-  window.js      uma janela: abas, layout, tela cheia, busca, permissões
-  privacy.js     escudos, HTTPS, cookies, links, sites perigosos, permissões
-  lists.js       listas de bloqueio e de ameaças, com atualização automática
-  importer.js    importação de outros navegadores
-  updater.js     atualização automática (Windows e Mac)
-  downloads.js   gerenciador de downloads
-  menus.js       menu do app e menus de botão direito
-  preload-*.js   proteções que rodam dentro das páginas (fingerprinting, scriptlets)
-src/ui/     barra de abas e barra de ferramentas
-src/pages/  páginas internas (nova aba, histórico, favoritos, configurações, erro)
-native/     módulo nativo dos gestos de trackpad (macOS)
-assets/     ícone do app e arquivos do instalador
-scripts/    geração do ícone, assinatura e publicação
+src/main/   main process
+  main.js        startup, IPC, bookmarks, suggestions, settings
+  window.js      windows: tabs, layout, fullscreen, find, permissions
+  privacy.js     shields, HTTPS, cookies, links, dangerous sites, permissions
+  lists.js       block and threat lists, with automatic updates
+  importer.js    importing from other browsers
+  passwords.js   saved passwords
+  extensions.js  Chrome extensions
+  updater.js     automatic updates (Windows and Mac)
+  downloads.js   download manager
+  menus.js       app menu and right-click menus
+  preload-*.js   protections that run inside pages (fingerprinting, scriptlets)
+src/i18n/   interface languages
+src/ui/     tab strip and toolbar
+src/pages/  internal pages (new tab, history, bookmarks, settings, errors)
+native/     native module for trackpad gestures (macOS)
+assets/     app icon and installer files
+scripts/    icon generation, signing and publishing
 ```
 
-Dados do usuário ficam em `~/Library/Application Support/Kitty` no Mac, em `%APPDATA%\Kitty` no Windows e em `~/.config/Kitty` no Linux.
+User data lives in `~/Library/Application Support/Kitty` on the Mac, `%APPDATA%\Kitty` on Windows and `~/.config/Kitty` on Linux.
 
-## Contribuir
+## Contributing
 
-Achou um bug ou quer sugerir algo? Abra uma [issue](https://github.com/CaioGobbi/kitty-browser/issues). Pull requests são bem-vindos.
+Found a bug or have an idea? Open an [issue](https://github.com/CaioGobbi/kitty-browser/issues). Pull requests are welcome.
 
-## Apoiar
+## Support
 
-O Kitty é gratuito e não tem anúncios nem coleta de dados. Se ele te ajuda, você pode apoiar o projeto:
+Kitty is free, with no ads and no data collection. If it helps you, you can support the project:
 
 <a href="https://buymeacoffee.com/caiogobbii"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40"></a>
 
-Ou pelo [GitHub Sponsors](https://github.com/sponsors/CaioGobbi), no botão **Sponsor** do topo da página.
+Or through [GitHub Sponsors](https://github.com/sponsors/CaioGobbi), with the **Sponsor** button at the top of the page.
 
-## Licença
+## License
 
-[MPL-2.0](LICENSE), a mesma do Firefox.
+[MPL-2.0](LICENSE), the same as Firefox.

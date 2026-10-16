@@ -19,4 +19,5 @@ fi
 # latest.yml goes last: installed copies only see the new version once the installer is there.
 gh release upload "$TAG" --repo "$REPO" --clobber "out/windows/Kitty-Setup-$VERSION.exe" "out/windows/Kitty-Setup-$VERSION.exe.blockmap"
 gh release upload "$TAG" --repo "$REPO" --clobber out/windows/latest.yml
+sh scripts/release-notes.sh
 echo "Publicado: https://github.com/$REPO/releases/tag/$TAG"
