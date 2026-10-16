@@ -1,15 +1,7 @@
 'use strict';
 
-const q = document.getElementById('q');
-q.focus();
-
-let searchUrl = 'https://duckduckgo.com/?q=';
-
-document.getElementById('search').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const text = q.value.trim();
-  if (text) location.href = searchUrl + encodeURIComponent(text);
-});
+// No search box here: typing goes to the address bar, which gets the focus
+// when a new tab opens (switchTab in window.js).
 
 function formatSaved(blocked) {
   // Rough estimate, like Brave: ~50 ms of load time saved per blocked request.
@@ -21,8 +13,6 @@ function formatSaved(blocked) {
 
 window.kitty.context().then((ctx) => {
   if (!ctx) return;
-  searchUrl = ctx.searchUrl;
-  q.placeholder = `Pesquise com ${ctx.engineName}`;
   document.body.classList.toggle('private', ctx.isPrivate);
   document.getElementById('private-note').hidden = !ctx.isPrivate;
   if (ctx.isPrivate) document.title = 'Janela privativa';

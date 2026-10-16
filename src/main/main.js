@@ -481,8 +481,7 @@ function registerIpc() {
   ipcMain.handle('kitty:context', (event) => {
     if (!fromPage(event)) return null;
     const found = registry.tabByWebContentsId(event.sender.id);
-    const e = engine();
-    return { isPrivate: !!found?.kwin.isPrivate, engineName: e.name, searchUrl: e.search };
+    return { isPrivate: !!found?.kwin.isPrivate };
   });
   ipcMain.handle('kitty:history', (event, query = '') => {
     if (!fromPage(event, 'history')) return [];
