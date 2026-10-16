@@ -16,4 +16,13 @@ else
   echo "   Crie com: .venv/bin/python -m castlabs_evs.account signup"
 fi
 
-codesign --force --deep --sign - "$PKG/Kitty.app"
+# A fixed identity keeps macOS permissions (Full Disk Access) across versions: an
+# ad-hoc signature changes with every build and macOS forgets them. Uses the
+# self-signed "Kitty Local" certificate when this Mac has it, ad-hoc otherwise.
+IDENTITY="${KITTY_SIGN_IDENTITY:-Kitty Local}"
+if security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
+  codesign --force --deep --sign "$IDENTITY" "$PKG/Kitty.app"
+else
+  echo "⚠️  Sem o certificado \"$IDENTITY\": assinatura ad-hoc (o macOS esquece permissões a cada versão)."
+  codesign --force --deep --sign - "$PKG/Kitty.app"
+fi
