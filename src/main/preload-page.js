@@ -20,6 +20,16 @@ if (location.protocol === 'kitty:') {
       get: invoke('kitty:site'),
       set: invoke('kitty:site-set'),
     },
+    extensions: {
+      list: invoke('kitty:extensions'),
+      enable: invoke('kitty:extensions-enable'),
+      pin: invoke('kitty:extensions-pin'),
+      remove: invoke('kitty:extensions-remove'),
+      options: invoke('kitty:extensions-options'),
+      store: invoke('kitty:extensions-store'),
+      update: invoke('kitty:extensions-update'),
+      setAutoUpdate: invoke('kitty:extensions-auto-update'),
+    },
     passwords: {
       list: invoke('kitty:passwords'),
       reveal: invoke('kitty:password-reveal'),

@@ -1156,7 +1156,7 @@ menuPanel.addEventListener('click', (e) => {
   if (action === 'new-tab') api.newTab();
   if (action === 'private') api.newPrivateWindow();
   if (action === 'new-window') api.newWindow();
-  if (['history', 'bookmarks', 'settings', 'passwords'].includes(action)) api.openInternal(action);
+  if (['history', 'bookmarks', 'settings', 'passwords', 'extensions'].includes(action)) api.openInternal(action);
   if (action === 'downloads') toggleDownloads();
   if (action === 'find') openFind();
 });

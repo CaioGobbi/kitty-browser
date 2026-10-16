@@ -40,7 +40,7 @@ function listenForShortcuts(webContents) {
 function resolveInput(input) {
   const text = String(input || '').trim();
   if (!text) return NEW_TAB_URL;
-  if (/^(https?|kitty|file|view-source):/i.test(text) || /^about:/i.test(text)) return text;
+  if (/^(https?|kitty|file|view-source|chrome-extension):/i.test(text) || /^about:/i.test(text)) return text;
   if (/^localhost(:\d+)?(\/|$)/i.test(text) || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/|$)/.test(text)) {
     return `http://${text}`;
   }
@@ -131,7 +131,11 @@ class KittyWindow {
       if (command === 'browser-backward') this.goBack();
       if (command === 'browser-forward') this.goForward();
     });
-    this.win.on('focus', () => registry.focus(this));
+    this.win.on('focus', () => {
+      registry.focus(this);
+      hooks.onChange();
+    });
+    this.win.on('blur', () => hooks.onChange());
     this.win.on('enter-full-screen', () => this.sendUi('ui:fullscreen', true));
     this.win.on('leave-full-screen', () => {
       this.sendUi('ui:fullscreen', false);

@@ -143,6 +143,8 @@ function buildAppMenu() {
       submenu: [
         { label: 'Configurações', accelerator: 'CmdOrCtrl+,', click: () => actions.openInternal('kitty://settings') },
         { label: 'Senhas', click: () => actions.openInternal('kitty://passwords') },
+        { label: 'Extensões', click: () => actions.openInternal('kitty://extensions') },
+        { label: 'Chrome Web Store', click: () => actions.openExtensionStore() },
       ],
     },
   ];
@@ -339,6 +341,12 @@ function pageContextMenu(kwin, tab, params) {
       { label: 'Imprimir…', click: () => wc.print() },
       { label: 'Ver código-fonte', enabled: isHttp(wc.getURL()), click: () => kwin.createTab(`view-source:${wc.getURL()}`) },
     );
+  }
+
+  const fromExtensions = require('./extensions').pageMenuItems(kwin, tab, params);
+  if (fromExtensions.length) {
+    sep();
+    items.push(...fromExtensions);
   }
 
   sep();

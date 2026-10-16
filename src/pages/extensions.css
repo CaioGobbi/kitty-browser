@@ -1,0 +1,20 @@
+main { max-width: 760px; margin: 0 auto; padding: 40px 24px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+h1 { margin: 0; font-size: 26px; }
+button.primary { border-color: var(--accent); background: var(--accent); color: #1a1020; font-weight: 600; }
+button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+.note { color: var(--muted); margin: 12px 0 24px; }
+.ext { display: flex; gap: 14px; align-items: flex-start; padding: 16px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ext.off { opacity: 0.6; }
+.ext img, .ext .letter { width: 40px; height: 40px; flex: none; border-radius: 8px; }
+.ext .letter { display: grid; place-items: center; background: var(--line); font-weight: 700; }
+.ext .info { flex: 1; min-width: 0; }
+.ext .name { font-weight: 600; }
+.ext .version { color: var(--muted); font-size: 12px; margin-left: 6px; font-weight: 400; }
+.ext .desc { color: var(--muted); font-size: 13px; margin: 2px 0 10px; }
+.ext .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ext .actions button { padding: 4px 12px; font-size: 13px; }
+.ext .actions .danger { color: var(--danger); }
+#empty { color: var(--muted); }
+.auto { display: flex; align-items: center; gap: 10px; margin-top: 28px; color: var(--muted); }
+.auto span { flex: 1; }

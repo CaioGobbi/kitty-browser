@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:" />
+    <title>Extensões</title>
+    <link rel="stylesheet" href="pages.css" />
+    <link rel="stylesheet" href="settings.css" />
+    <link rel="stylesheet" href="extensions.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Extensões</h1>
+        <button id="store" class="primary">Adicionar da Chrome Web Store</button>
+      </header>
+      <p class="note">O Kitty instala extensões do Chrome pela Chrome Web Store. Elas não funcionam em janelas privativas, e algumas funções do Chrome (atalhos de teclado das extensões, painel lateral, comunicação com apps instalados) ainda não existem aqui.</p>
+      <div id="list"></div>
+      <p id="empty" hidden>Nenhuma extensão instalada. Abra a Chrome Web Store, escolha uma extensão e clique em “Usar no Chrome”.</p>
+      <label class="auto">
+        <input id="auto" type="checkbox" class="toggle" />
+        <span>Atualizar as extensões sozinho pela Chrome Web Store</span>
+        <button id="update">Procurar atualizações</button>
+      </label>
+    </main>
+    <script src="extensions.js"></script>
+  </body>
+</html>

@@ -56,6 +56,10 @@ const SETTING_DEFAULTS = {
   autoUpdateLists: true,
   autoUpdate: true,
   widevine: true, // DRM video (Netflix, Spotify…): downloaded from Google
+  autoUpdateExtensions: true, // installed extensions check the Chrome Web Store for updates
+  // Chrome extensions (extensions.js): ids switched off, and ids pinned to the toolbar in order
+  extensionsDisabled: [],
+  extensionsPinned: [],
 };
 
 /** Where the tabs go: see `tabLayout` above. */

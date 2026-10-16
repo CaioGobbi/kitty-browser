@@ -17,6 +17,7 @@ const importer = require('./importer');
 const bookmarkEdits = require('./bookmarks');
 const passwords = require('./passwords');
 const siteinfo = require('./siteinfo');
+const extensions = require('./extensions');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 const tabdrag = require('./tabdrag');
@@ -434,7 +435,7 @@ function registerIpc() {
     wc.reload();
   });
   ui('open:internal', (_w, page) => {
-    if (['history', 'bookmarks', 'settings', 'passwords'].includes(page)) openInternal(`kitty://${page}`);
+    if (['history', 'bookmarks', 'settings', 'passwords', 'extensions'].includes(page)) openInternal(`kitty://${page}`);
   });
   ui('window:private', () => newPrivateWindow());
   ui('window:new', () => newWindow());
@@ -672,16 +673,23 @@ app.whenReady().then(async () => {
   }
 
   hooks.setupProfile = setupProfile;
-  hooks.onChange = persistSession;
+  hooks.onChange = () => {
+    persistSession();
+    extensions.browserChanged();
+  };
   hooks.contextMenu = menus.pageContextMenu;
   hooks.shortcut = menus.handleShortcut;
   hooks.favicon = rememberFavicon;
-  hooks.tabCreated = passwords.watchTab;
+  hooks.tabCreated = (kwin, tab) => {
+    passwords.watchTab(kwin, tab);
+    extensions.watchNavigation(tab.view.webContents);
+  };
   hooks.passwordOffer = passwords.offerFor;
   Object.assign(menus.actions, {
     newWindow,
     newPrivateWindow,
     openInternal,
+    openExtensionStore: () => extensions.openStore(),
     toggleBookmark,
     editBookmarks,
     bookmarkDialog,
@@ -698,8 +706,19 @@ app.whenReady().then(async () => {
   registerIpc();
   passwords.registerIpc({ fromPage, openPasswords: () => openInternal('kitty://passwords') });
   siteinfo.registerIpc({ fromPage, openInternal });
+  extensions.registerIpc({ fromPage });
   menus.buildAppMenu();
   const listsReady = lists.init({ canUpdate: () => allowed('autoUpdateLists') });
+
+  // Before the windows: restored tabs may show extension pages.
+  const extensionsReady = extensions
+    .init(session.fromPartition('persist:kitty'), {
+      newWindow,
+      adoptWindow: (tab, bounds) => new KittyWindow({ adopt: tab, bounds }),
+      openInternal,
+    })
+    .catch((err) => console.error('[kitty] extensões:', err));
+  await Promise.race([extensionsReady, new Promise((r) => setTimeout(r, 3000))]);
 
   const saved = data.settings.get('restoreSession') ? structuredClone(data.session.get('windows')) : [];
   if (!data.settings.get('setupDone')) withSetupTab(saved);

@@ -46,6 +46,17 @@ contextBridge.exposeInMainWorld('kittyUI', {
   siteInfo: () => ipcRenderer.invoke('ui:site-info'),
   siteAction: (action) => ipcRenderer.invoke('ui:site-action', action),
 
+  extReady: send('ext:ui-ready'),
+  extClick: send('ext:ui-click'),
+  extMenu: send('ext:ui-menu'),
+  extPin: send('ext:ui-pin'),
+  extManage: send('ext:ui-manage'),
+  extStore: send('ext:ui-store'),
+  onExtensions: on('extensions:state'),
+  onExtInstalled: on('extensions:installed'),
+  onExtOpenPopup: on('extensions:open-popup'),
+  onExtPopup: on('extensions:popup'),
+
   onState: on('tabs:state'),
   onBookmarks: on('bookmarks:state'),
   onBookmarkDialog: on('bookmark:dialog'),
