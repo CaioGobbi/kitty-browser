@@ -943,6 +943,7 @@ body.dragging-bookmark #scrim {
 }
 #menu-panel button {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   width: 100%;
   height: 32px;
@@ -959,9 +960,10 @@ body.dragging-bookmark #scrim {
   color: var(--muted);
   font: inherit;
   font-size: 12px;
+  line-height: 1;
 }
 #menu-panel hr {
-  margin: 5px 4px;
+  margin: 6px 4px;
   border: 0;
   border-top: 1px solid var(--line);
 }

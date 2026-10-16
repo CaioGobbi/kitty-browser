@@ -170,6 +170,7 @@ layoutObserver.observe(sidebar);
 $('sidebar-collapse').addEventListener('click', () => api.setLayoutSetting('verticalTabsCollapsed', !uiSettings.verticalTabsCollapsed));
 
 let openPopup = null;
+let downloadsLinger = null; // timer that hides the downloads button
 function showPopup(popup, position) {
   closePopup({ keepFocus: true });
   openPopup = popup;
@@ -185,9 +186,15 @@ function closePopup({ keepFocus = false } = {}) {
     suggestionItems = [];
     selectedSuggestion = 0;
   }
+  const wasDownloads = openPopup === downloadsPanel;
   openPopup.hidden = true;
   openPopup = null;
   scrim.hidden = true;
+  if (wasDownloads) {
+    clearTimeout(downloadsLinger);
+    downloadsLinger = null;
+    downloadsBtn.hidden = !downloads.some((d) => d.state === 'progressing');
+  }
   api.setChrome({ overlay: false });
   if (!keepFocus && document.activeElement === address) address.blur();
 }
@@ -1045,8 +1052,26 @@ function downloadStatus(d) {
   }
 }
 
+// The toolbar button only shows while something is downloading, for a while
+// after the last download ends, and while its panel is open.
+const DOWNLOADS_LINGER_MS = 30000;
+
+function updateDownloadsBtn() {
+  const busy = downloads.some((d) => d.state === 'progressing');
+  if (busy) {
+    clearTimeout(downloadsLinger);
+    downloadsLinger = null;
+  } else if (!downloadsBtn.hidden && !downloadsLinger && openPopup !== downloadsPanel) {
+    downloadsLinger = setTimeout(() => {
+      downloadsLinger = null;
+      if (openPopup !== downloadsPanel) downloadsBtn.hidden = true;
+    }, DOWNLOADS_LINGER_MS);
+  }
+  downloadsBtn.hidden = !busy && !downloadsLinger && openPopup !== downloadsPanel;
+}
+
 function renderDownloads() {
-  downloadsBtn.hidden = downloads.length === 0;
+  updateDownloadsBtn();
   const active = downloads.filter((d) => d.state === 'progressing');
   const total = active.reduce((s, d) => s + (d.total || 0), 0);
   const received = active.reduce((s, d) => s + d.received, 0);
@@ -1106,6 +1131,8 @@ downloadsBtn.addEventListener('click', toggleDownloads);
 $('downloads-clear').addEventListener('click', () => api.clearDownloads());
 api.onToggleDownloads(toggleDownloads);
 api.onDownloadStarted(() => {
+  downloadsBtn.hidden = false;
+  updateDownloadsBtn();
   downloadsBtn.classList.remove('bump');
   void downloadsBtn.offsetWidth;
   downloadsBtn.classList.add('bump');
