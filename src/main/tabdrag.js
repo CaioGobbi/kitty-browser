@@ -1,10 +1,12 @@
 'use strict';
 
-// Dragging a tab out of its window, like Chrome: once the pointer leaves the
-// tab strip, the tab becomes a window of its own that follows the cursor (the
-// page keeps running: a video doesn't restart). Dropped on the tab strip of
-// another Kitty window, it joins that window instead. A window's only tab
-// drags the whole window along.
+// Dragging a tab out of its window, the way Chromium (and so Chrome, Brave and
+// Helium) does it: once the pointer is pulled away from the tab strip, the tab
+// becomes a window of its own that follows the cursor (the page keeps running:
+// a video doesn't restart). Passing over the tab strip of any Kitty window,
+// the original included, puts the tab right into it, where it can still be
+// moved along or pulled out again; Esc puts everything back. A window's only
+// tab drags the whole window along.
 //
 // The UI that started the drag keeps receiving the pointer (it was pressed
 // there), so it reports moves and the drop; positions come from the cursor.
@@ -14,33 +16,85 @@ const { registry } = require('./registry');
 const { KittyWindow } = require('./window');
 
 const STRIP_HEIGHT = 40; // #tabstrip in ui.css
-const STRIP_SLACK = 10; // a little below the strip still counts as "on it"
+const MAGNETISM = 15; // Chromium's kVerticalDetachMagnetism: the strip reaches this far up and down
 
-/** @type {{ kwin: KittyWindow, tabId: number, offset: {x: number, y: number}, target: KittyWindow | null } | null} */
+/**
+ * @type {{
+ *   tabId: number,
+ *   offset: {x: number, y: number},        // pointer position inside the floating window
+ *   floating: KittyWindow,                 // the window following the cursor (empty and invisible while attached)
+ *   attached: KittyWindow | null,          // the window whose strip the tab is in right now
+ *   slots: number[] | null,                // screen x of the middle of the other tabs of `attached`
+ *   busy: boolean,
+ *   origin: { kwin: KittyWindow, index: number, position: number[] },
+ * } | null}
+ */
 let drag = null;
 
-/** The window whose tab strip is under `point`, other than the one being dragged. */
-function stripAt(point, dragged) {
-  const candidates = [...registry.windows].filter(
-    (w) => w !== dragged && w.session === dragged.session && !w.win.isDestroyed() && w.win.isVisible() && !w.win.isMinimized(),
-  );
-  // The focused window is on top of the others.
-  candidates.sort((a, b) => Number(b.win.isFocused()) - Number(a.win.isFocused()));
+const alive = (kwin) => kwin && !kwin.win.isDestroyed();
+
+function inStrip(kwin, point) {
+  const b = kwin.win.getContentBounds();
   return (
-    candidates.find((w) => {
-      const b = w.win.getContentBounds();
-      return point.x >= b.x && point.x < b.x + b.width && point.y >= b.y && point.y < b.y + STRIP_HEIGHT + STRIP_SLACK;
-    }) || null
+    point.x >= b.x &&
+    point.x < b.x + b.width &&
+    point.y >= b.y - MAGNETISM &&
+    point.y <= b.y + STRIP_HEIGHT + MAGNETISM
   );
 }
 
-function setTarget(target) {
-  if (drag.target === target) return;
-  drag.target?.sendUi('tabs:drop-hint', false);
-  drag.target = target;
-  target?.sendUi('tabs:drop-hint', true);
-  // The dragged window turns see-through over a strip, so the drop spot shows.
-  if (!drag.kwin.win.isDestroyed()) drag.kwin.win.setOpacity(target ? 0.55 : 1);
+/** The window whose tab strip is under `point`, other than the floating one. */
+function stripAt(point) {
+  const candidates = [...registry.windows].filter(
+    (w) => w !== drag.floating && w.session === drag.floating.session && alive(w) && w.win.isVisible() && !w.win.isMinimized(),
+  );
+  // The focused window is on top of the others.
+  candidates.sort((a, b) => Number(b.win.isFocused()) - Number(a.win.isFocused()));
+  return candidates.find((w) => inStrip(w, point)) || null;
+}
+
+/** Where the middle of each tab of `kwin` is on screen (the dragged tab isn't there yet). */
+async function measureSlots(kwin) {
+  const left = kwin.win.getContentBounds().x;
+  const mids = await kwin.ui.webContents
+    .executeJavaScript(
+      `[...document.querySelectorAll('#tabs .tab:not(.closing)')].map((t) => { const r = t.getBoundingClientRect(); return r.left + r.width / 2; })`,
+    )
+    .catch(() => []);
+  return mids.map((mid) => left + mid);
+}
+
+const indexAt = (x) => drag.slots.filter((mid) => mid < x).length;
+
+/** Makes the floating window vanish without hiding it: it may be the window holding the pointer. */
+function setFloatingVisible(kwin, visible) {
+  kwin.win.setOpacity(visible ? 1 : 0);
+  kwin.win.setIgnoreMouseEvents(!visible);
+}
+
+async function attach(target, cursor) {
+  drag.busy = true;
+  const slots = await measureSlots(target);
+  if (!drag) return;
+  drag.busy = false;
+  if (!alive(target) || !alive(drag.floating)) return;
+  const tab = drag.floating.releaseTab(drag.tabId, { allowEmpty: true });
+  if (!tab) return;
+  drag.slots = slots;
+  drag.attached = target;
+  setFloatingVisible(drag.floating, false);
+  target.adoptTab(tab, indexAt(cursor.x), { focus: false });
+}
+
+function detach(cursor) {
+  const tab = drag.attached.releaseTab(drag.tabId);
+  if (!tab) return; // it's that window's only tab: it stays
+  drag.attached = null;
+  drag.slots = null;
+  const { floating } = drag;
+  floating.win.setPosition(cursor.x - drag.offset.x, cursor.y - drag.offset.y);
+  floating.adoptTab(tab, 0, { focus: false });
+  setFloatingVisible(floating, true);
 }
 
 /**
@@ -48,62 +102,84 @@ function setTarget(target) {
  * window the tab ends up in: over the tab, at the start of the new strip.
  */
 function start(kwin, tabId, grab) {
-  if (drag) {
-    // A drop that never arrived (the pointer was lost): forget that drag.
-    setTarget(null);
-    if (!drag.kwin.win.isDestroyed()) drag.kwin.win.focus();
-    drag = null;
-  }
+  if (drag) end(); // a drop that never arrived (the pointer was lost)
   if (!kwin.tabs.has(tabId)) return;
   const cursor = screen.getCursorScreenPoint();
+  const origin = { kwin, index: kwin.order.indexOf(tabId), position: kwin.win.getPosition() };
+  // Esc arrives at the UI that owns the pointer.
+  kwin.ui.webContents.focus();
   if (kwin.order.length === 1) {
     if (kwin.win.isFullScreen() || kwin.win.isMaximized()) return;
-    const [x, y] = kwin.win.getPosition();
-    drag = { kwin, tabId, offset: { x: cursor.x - x, y: cursor.y - y }, target: null };
+    const [x, y] = origin.position;
+    drag = { tabId, offset: { x: cursor.x - x, y: cursor.y - y }, floating: kwin, attached: null, slots: null, busy: false, origin };
     return;
   }
   const offset = { x: Math.round(grab?.x) || 100, y: Math.round(grab?.y) || 20 };
-  const [width, height] = kwin.win.getSize();
+  const { width, height } = kwin.win.getNormalBounds(); // not the whole screen of a fullscreen window
   const tab = kwin.releaseTab(tabId);
   if (!tab) return;
-  const fresh = new KittyWindow({ adopt: tab, bounds: { x: cursor.x - offset.x, y: cursor.y - offset.y, width, height } });
-  drag = { kwin: fresh, tabId, offset, target: null };
+  const floating = new KittyWindow({ adopt: tab, bounds: { x: cursor.x - offset.x, y: cursor.y - offset.y, width, height } });
+  drag = { tabId, offset, floating, attached: null, slots: null, busy: false, origin };
 }
 
 function move() {
-  if (!drag || drag.kwin.win.isDestroyed()) return;
+  if (!drag || drag.busy) return;
+  if (!alive(drag.floating)) return void (drag = null);
   const cursor = screen.getCursorScreenPoint();
-  drag.kwin.win.setPosition(cursor.x - drag.offset.x, cursor.y - drag.offset.y);
-  setTarget(stripAt(cursor, drag.kwin));
+  const { attached } = drag;
+  if (attached) {
+    if (!alive(attached)) return void (drag = null);
+    if (!inStrip(attached, cursor)) return detach(cursor);
+    // Slides along the strip, like a reorder.
+    const index = indexAt(cursor.x);
+    const pinned = attached.tabs.get(drag.tabId)?.pinned;
+    if (attached.order.indexOf(drag.tabId) !== attached.clampToGroup(index, pinned)) attached.moveTab(drag.tabId, index);
+    return;
+  }
+  drag.floating.win.setPosition(cursor.x - drag.offset.x, cursor.y - drag.offset.y);
+  const target = stripAt(cursor);
+  if (target) attach(target, cursor);
 }
 
-async function end() {
+function end() {
   if (!drag) return;
   move();
-  const { kwin, tabId, target } = drag;
-  setTarget(null);
+  const { floating, attached } = drag;
   drag = null;
-  if (kwin.win.isDestroyed()) return;
-  if (!target || target.win.isDestroyed()) return kwin.win.focus();
-
-  // Joins the other window where it was dropped, like a reorder there.
-  const cursor = screen.getCursorScreenPoint();
-  const x = cursor.x - target.win.getContentBounds().x;
-  const index = await target.ui.webContents
-    .executeJavaScript(
-      `(() => {
-        const tabs = [...document.querySelectorAll('#tabs .tab:not(.closing)')];
-        const i = tabs.findIndex((t) => { const r = t.getBoundingClientRect(); return ${x} < r.left + r.width / 2; });
-        return i === -1 ? tabs.length : i;
-      })()`,
-    )
-    .catch(() => target.order.length);
-  if (kwin.win.isDestroyed() || target.win.isDestroyed()) return;
-  const tab = kwin.releaseTab(tabId, { allowEmpty: true });
-  if (!tab) return;
-  target.adoptTab(tab, index);
-  target.win.focus();
-  if (kwin.order.length === 0) kwin.win.close();
+  if (alive(attached)) {
+    attached.win.focus();
+    if (alive(floating) && floating.order.length === 0) floating.win.close();
+  } else if (alive(floating)) {
+    setFloatingVisible(floating, true);
+    floating.win.focus();
+  }
 }
 
-module.exports = { start, move, end };
+/** Esc: the tab goes back where it was. */
+function cancel() {
+  if (!drag) return;
+  const { floating, attached, origin, tabId } = drag;
+  drag = null;
+  const holder = attached || floating;
+  if (!alive(holder) || !alive(origin.kwin)) return;
+  if (origin.kwin === floating) {
+    // The whole window was dragged along: back to its place, with its tab.
+    if (attached) {
+      const tab = attached.releaseTab(tabId);
+      if (tab) floating.adoptTab(tab, 0);
+    }
+    floating.win.setPosition(...origin.position);
+  } else if (holder === origin.kwin) {
+    origin.kwin.moveTab(tabId, origin.index);
+  } else {
+    const tab = holder.releaseTab(tabId, { allowEmpty: true });
+    if (tab) origin.kwin.adoptTab(tab, origin.index);
+  }
+  if (alive(floating)) {
+    setFloatingVisible(floating, true);
+    if (floating.order.length === 0) floating.win.close();
+  }
+  origin.kwin.win.focus();
+}
+
+module.exports = { start, move, end, cancel };

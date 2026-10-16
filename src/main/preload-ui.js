@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
   dragTabOut: send('tab:drag-out'),
   dragTabMove: send('tab:drag-move'),
   dragTabEnd: send('tab:drag-end'),
+  cancelTabDrag: send('tab:drag-cancel'),
   tabMenu: send('tab:menu'),
   muteTab: send('tab:mute'),
   navigate: send('nav:go'),
@@ -43,7 +44,6 @@ contextBridge.exposeInMainWorld('kittyUI', {
   suggest: (text) => ipcRenderer.invoke('ui:suggest', text),
 
   onState: on('tabs:state'),
-  onDropHint: on('tabs:drop-hint'),
   onBookmarks: on('bookmarks:state'),
   onBookmarkDialog: on('bookmark:dialog'),
   onDownloads: on('downloads:state'),

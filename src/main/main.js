@@ -394,6 +394,7 @@ function registerIpc() {
   ui('tab:drag-out', (w, id, grab) => tabdrag.start(w, Number(id), grab));
   ui('tab:drag-move', () => tabdrag.move());
   ui('tab:drag-end', () => tabdrag.end());
+  ui('tab:drag-cancel', () => tabdrag.cancel());
   ui('tab:mute', (w, id) => w.toggleMute(id));
   ui('nav:go', (w, input) => w.navigate(input));
   ui('nav:back', (w) => w.activeWebContents()?.navigationHistory.goBack());
