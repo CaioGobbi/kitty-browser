@@ -50,14 +50,19 @@ function resolveInput(input) {
 
 class KittyWindow {
   /**
-   * @param {{ isPrivate?: boolean, restore?: { tabs: {url: string, title?: string, favicon?: string}[], active?: number } }} options
+   * `adopt` is a tab dragged out of another window: the new window takes it
+   * over, page and all, and shares that window's session (private included).
+   * @param {{ isPrivate?: boolean, restore?: { tabs: {url: string, title?: string, favicon?: string}[], active?: number }, adopt?: object, bounds?: {x: number, y: number, width: number, height: number} }} options
    */
-  constructor({ isPrivate = false, restore = null } = {}) {
+  constructor({ isPrivate = false, restore = null, adopt = null, bounds = null } = {}) {
+    if (adopt) isPrivate = adopt.owner.isPrivate;
     this.isPrivate = isPrivate;
-    this.session = isPrivate
-      ? session.fromPartition(`kitty-private-${++privateCounter}`) // in memory only
-      : session.fromPartition('persist:kitty');
-    if (isPrivate) hooks.setupProfile(this.session, { isPrivate: true });
+    this.session = adopt
+      ? adopt.owner.session
+      : isPrivate
+        ? session.fromPartition(`kitty-private-${++privateCounter}`) // in memory only
+        : session.fromPartition('persist:kitty');
+    if (isPrivate && !adopt) hooks.setupProfile(this.session, { isPrivate: true });
 
     /** @type {Map<number, any>} */
     this.tabs = new Map();
@@ -74,6 +79,8 @@ class KittyWindow {
     this.win = new BaseWindow({
       width: 1280,
       height: 820,
+      ...bounds,
+      show: !adopt, // shown without focus, so the drag carrying it goes on
       minWidth: 480,
       minHeight: 320,
       title: isPrivate ? 'Kitty — Janela privativa' : 'Kitty',
@@ -99,6 +106,7 @@ class KittyWindow {
     this.win.contentView.addChildView(this.ui);
     this.ui.webContents.loadFile(path.join(UI_DIR, 'index.html'), { query: { private: isPrivate ? '1' : '0' } });
     this.ui.webContents.once('did-finish-load', () => {
+      if (adopt) return;
       if (restore?.tabs?.length) this.restoreTabs(restore);
       else this.createTab();
     });
@@ -123,6 +131,10 @@ class KittyWindow {
     this.win.on('closed', () => this.destroy());
 
     registry.add(this);
+    if (adopt) {
+      this.adoptTab(adopt, 0, { focus: false });
+      this.win.showInactive();
+    }
     this.layout();
   }
 
@@ -243,6 +255,7 @@ class KittyWindow {
     listenForShortcuts(wc);
     const tab = {
       id: wc.id,
+      owner: this, // the KittyWindow showing this tab; changes when the tab moves
       view,
       blocked: new Set(),
       favicon,
@@ -267,6 +280,7 @@ class KittyWindow {
     return tab;
   }
 
+  // Handlers go through tab.owner, not `this`: a tab can move to another window.
   wireTab(tab) {
     const wc = tab.view.webContents;
 
@@ -284,43 +298,43 @@ class KittyWindow {
           },
         };
       }
-      this.createTab(url, { activate: disposition !== 'background-tab' });
+      tab.owner.createTab(url, { activate: disposition !== 'background-tab' });
       return { action: 'deny' };
     });
 
     wc.on('did-start-navigation', (details) => {
       if (details.isMainFrame && !details.isSameDocument) {
         tab.blocked.clear();
-        this.denyPrompts(tab);
+        tab.owner.denyPrompts(tab);
       }
-      this.sendState();
+      tab.owner.sendState();
     });
     wc.on('did-navigate', (_e, url) => {
       // Chromium only reports a favicon when it changes, so a reload keeps the
       // old one; it's cleared only when the tab moves to another site.
       if (originOf(url) !== tab.faviconOrigin) tab.favicon = null;
       if (url.startsWith('kitty://blocked')) tab.threatBlocked = false;
-      if (url.startsWith('kitty://error')) this.dropFailedEntry(wc, url);
-      this.recordHistory(wc);
-      this.sendState();
+      if (url.startsWith('kitty://error')) tab.owner.dropFailedEntry(wc, url);
+      tab.owner.recordHistory(wc);
+      tab.owner.sendState();
     });
     wc.on('did-navigate-in-page', (_e, _url, isMainFrame) => {
-      if (isMainFrame) this.recordHistory(wc);
-      this.sendState();
+      if (isMainFrame) tab.owner.recordHistory(wc);
+      tab.owner.sendState();
     });
     wc.on('page-title-updated', () => {
-      this.recordHistory(wc);
-      this.sendState();
+      tab.owner.recordHistory(wc);
+      tab.owner.sendState();
     });
     wc.on('page-favicon-updated', (_e, favicons) => {
       tab.favicon = favicons[0] || null;
       tab.faviconOrigin = originOf(wc.getURL());
-      if (!this.isPrivate && tab.favicon) hooks.favicon(this.session, wc.getURL(), tab.favicon);
-      this.sendState();
+      if (!tab.owner.isPrivate && tab.favicon) hooks.favicon(tab.owner.session, wc.getURL(), tab.favicon);
+      tab.owner.sendState();
     });
-    wc.on('did-start-loading', () => this.sendState());
-    wc.on('did-stop-loading', () => this.sendState());
-    wc.on('audio-state-changed', () => this.sendState());
+    wc.on('did-start-loading', () => tab.owner.sendState());
+    wc.on('did-stop-loading', () => tab.owner.sendState());
+    wc.on('audio-state-changed', () => tab.owner.sendState());
     wc.on('did-fail-load', (_e, code, desc, failedUrl, isMainFrame) => {
       if (!isMainFrame || code === -3) return; // -3 = aborted (e.g. user hit stop)
       if (code === -20 && tab.threatBlocked) return; // blocked on purpose: the warning page is on its way
@@ -331,19 +345,19 @@ class KittyWindow {
     });
     wc.on('context-menu', (_e, params) => hooks.contextMenu(this, tab, params));
     wc.on('found-in-page', (_e, result) => {
-      if (tab.id === this.activeId) this.sendUi('find:result', { active: result.activeMatchOrdinal, matches: result.matches });
+      if (tab.id === tab.owner.activeId) tab.owner.sendUi('find:result', { active: result.activeMatchOrdinal, matches: result.matches });
     });
     // Electron itself puts the window in and out of fullscreen for the page.
     // Kitty only hides its own interface: toggling the window here too made
     // Electron think the user had chosen fullscreen, so on the way out it never
     // told the page it had left — the video stayed stuck in fullscreen mode.
     wc.on('enter-html-full-screen', () => {
-      if (tab.id !== this.activeId) return;
-      this.htmlFullscreen = true;
-      this.layout();
+      if (tab.id !== tab.owner.activeId) return;
+      tab.owner.htmlFullscreen = true;
+      tab.owner.layout();
     });
-    wc.on('leave-html-full-screen', () => this.exitHtmlFullscreen());
-    hooks.tabCreated(this, tab);
+    wc.on('leave-html-full-screen', () => tab.owner.exitHtmlFullscreen());
+    hooks.tabCreated(tab.owner, tab);
   }
 
   exitHtmlFullscreen() {
@@ -367,7 +381,7 @@ class KittyWindow {
     this.switchTab(this.order[activeIndex]);
   }
 
-  switchTab(id) {
+  switchTab(id, { focus = true } = {}) {
     const tab = this.tabs.get(id);
     if (!tab) return;
     const previous = this.activeTab();
@@ -391,6 +405,7 @@ class KittyWindow {
     this.layout();
     this.sendState();
 
+    if (!focus) return;
     const url = tab.view.webContents.getURL();
     if (!url || isInternal(url)) this.focusAddressBar();
     else tab.view.webContents.focus();
@@ -448,6 +463,41 @@ class KittyWindow {
     this.order.splice(from, 1);
     this.order.splice(this.clampToGroup(toIndex, this.tabs.get(id).pinned), 0, id);
     this.sendState();
+  }
+
+  /**
+   * Takes a tab out of this window without closing its page, so another window
+   * can adopt it. The last tab only leaves with `allowEmpty` (the window is
+   * about to close).
+   */
+  releaseTab(id, { allowEmpty = false } = {}) {
+    const tab = this.tabs.get(id);
+    if (!tab || (this.order.length < 2 && !allowEmpty)) return null;
+    if (this.activeId === id) {
+      if (this.htmlFullscreen) {
+        tab.view.webContents.executeJavaScript('document.exitFullscreen?.()', true).catch(() => {});
+        this.exitHtmlFullscreen();
+      }
+      if (this.findText) tab.view.webContents.stopFindInPage('clearSelection');
+      this.win.contentView.removeChildView(tab.view);
+    }
+    const index = this.order.indexOf(id);
+    this.order.splice(index, 1);
+    this.tabs.delete(id);
+    if (this.activeId === id) {
+      this.activeId = null;
+      if (this.order.length) this.switchTab(this.order[Math.min(index, this.order.length - 1)]);
+    }
+    this.sendState();
+    return tab;
+  }
+
+  /** Puts a tab released by another window into this one and shows it. */
+  adoptTab(tab, index = this.order.length, { focus = true } = {}) {
+    tab.owner = this;
+    this.tabs.set(tab.id, tab);
+    this.order.splice(this.clampToGroup(index, tab.pinned), 0, tab.id);
+    this.switchTab(tab.id, { focus });
   }
 
   /** Pinned tabs live at the start of the strip; an index never crosses that boundary. */
@@ -615,7 +665,10 @@ class KittyWindow {
     this.tabs.clear();
     this.order = [];
     if (!this.ui.webContents.isDestroyed()) this.ui.webContents.close();
-    if (this.isPrivate) {
+    // Windows made from a dragged private tab share its session: it's only
+    // wiped with the last of them.
+    const shared = [...registry.windows].some((w) => w !== this && w.session === this.session);
+    if (this.isPrivate && !shared) {
       this.session.clearStorageData().catch(() => {});
       this.session.clearCache().catch(() => {});
     }

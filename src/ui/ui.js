@@ -301,15 +301,40 @@ function createTabNode(id) {
 // their middle, and the final position is sent to the main process. A tab
 // stays inside its own group (pinned or not), so it never slides over the
 // window controls and lands exactly where it is dropped.
+// Pulled away from the strip, the tab leaves the window: the main process
+// turns it into a window that follows the pointer (tabdrag.js), and this
+// view keeps reporting moves and the drop.
+const DETACH_DISTANCE = 30;
 let dragging = null;
 function startTabDrag(down, node, id) {
   const grab = down.clientX - node.getBoundingClientRect().left;
   const pinned = node.classList.contains('pinned');
   const group = () => liveTabs().filter((n) => n.classList.contains('pinned') === pinned);
   let started = false;
+  let detached = false;
   let minLeft = 0;
   let maxLeft = 0;
+  const leftStrip = (e) => {
+    const strip = tabsEl.parentElement.getBoundingClientRect();
+    return (
+      e.clientY > strip.bottom + DETACH_DISTANCE ||
+      e.clientY < strip.top - DETACH_DISTANCE ||
+      e.clientX < -DETACH_DISTANCE ||
+      e.clientX > window.innerWidth + DETACH_DISTANCE
+    );
+  };
   const onMove = (e) => {
+    if (detached) return api.dragTabMove();
+    if (started && leftStrip(e)) {
+      detached = true;
+      // The tab is about to leave this strip (and its node with it): keep the pointer here.
+      document.body.setPointerCapture?.(down.pointerId);
+      node.classList.remove('dragging');
+      node.style.transform = '';
+      dragging = null;
+      api.dragTabOut(id, { x: tabsEl.getBoundingClientRect().left + grab, y: down.clientY });
+      return;
+    }
     if (!started) {
       if (Math.abs(e.clientX - down.clientX) < 5) return;
       started = true;
@@ -350,6 +375,7 @@ function startTabDrag(down, node, id) {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onUp);
+    if (detached) return api.dragTabEnd();
     if (!started) return;
     node.classList.remove('dragging');
     const offset = node.style.transform;
@@ -996,6 +1022,7 @@ api.onSettings((next) => {
   renderBookmarks();
   renderToolbar();
 });
+api.onDropHint((on) => tabsEl.parentElement.classList.toggle('drop-hint', on));
 api.onFullscreen((on) => document.body.classList.toggle('fullscreen', on));
 api.onFocusAddress(() => {
   closePopup({ keepFocus: true });

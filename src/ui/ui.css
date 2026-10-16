@@ -159,6 +159,11 @@ body.linux #tabstrip {
   padding-right: 140px;
 }
 
+#tabstrip.drop-hint {
+  box-shadow: inset 0 -2px 0 var(--accent);
+  background: color-mix(in srgb, var(--accent-soft), var(--strip));
+}
+
 #tabs {
   display: flex;
   gap: 2px;

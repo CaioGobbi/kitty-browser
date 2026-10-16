@@ -92,20 +92,20 @@ function answerOffer(kwin, { tabId, offerId, answer } = {}) {
   kwin.sendState();
 }
 
-/** Called for every new tab (window.js hooks.tabCreated). */
-function watchTab(kwin, tab) {
+/** Called for every new tab (window.js hooks.tabCreated). tab.owner follows the tab between windows. */
+function watchTab(_kwin, tab) {
   const wc = tab.view.webContents;
   wc.on('did-start-navigation', (details) => {
     if (!details.isMainFrame || details.isSameDocument) return;
     const offer = tab.passwordOffer;
     if (offer && Date.now() - offer.shownAt > OFFER_TTL) {
       tab.passwordOffer = null;
-      kwin.sendState();
+      tab.owner.sendState();
     }
   });
   // The usual sign that a login worked: the page moved on.
-  wc.on('did-navigate', () => tab.pendingLogin && showOffer(kwin, tab));
-  wc.on('did-navigate-in-page', (_e, _url, isMainFrame) => isMainFrame && tab.pendingLogin && showOffer(kwin, tab));
+  wc.on('did-navigate', () => tab.pendingLogin && showOffer(tab.owner, tab));
+  wc.on('did-navigate-in-page', (_e, _url, isMainFrame) => isMainFrame && tab.pendingLogin && showOffer(tab.owner, tab));
 }
 
 // ---------------------------------------------------------------------------
