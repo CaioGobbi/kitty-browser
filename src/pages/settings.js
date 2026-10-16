@@ -255,3 +255,16 @@ $('import').addEventListener('click', async (e) => {
 
 settings.get().then(render);
 loadImportSources();
+
+// One section at a time, chosen in the side menu; the address keeps it (#senhas, #importar…).
+function showSection() {
+  const sections = [...document.querySelectorAll('main > section')];
+  const current = sections.find((s) => `#${s.id}` === location.hash) || sections[0];
+  for (const s of sections) s.classList.toggle('current', s === current);
+  for (const a of document.querySelectorAll('#menu a')) {
+    a.toggleAttribute('aria-current', a.getAttribute('href') === `#${current.id}`);
+  }
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', showSection);
+showSection();

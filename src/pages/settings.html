@@ -8,19 +8,39 @@
     <link rel="stylesheet" href="settings.css" />
   </head>
   <body>
-    <main>
+    <nav id="menu">
       <h1>Configurações</h1>
+      <a href="#geral">Geral</a>
+      <a href="#aparencia">Aparência</a>
+      <a href="#busca">Busca</a>
+      <a href="#privacidade">Privacidade e segurança</a>
+      <a href="#permissoes">Permissões de sites</a>
+      <a href="#senhas">Senhas</a>
+      <a href="#importar">Importar dados</a>
+      <a href="#downloads">Downloads</a>
+      <a href="#limpar">Limpar dados de navegação</a>
+      <a href="#sobre">Sobre o Kitty</a>
+    </nav>
+    <main>
 
-      <section>
+      <section id="geral">
         <h2>Geral</h2>
-        <label class="row">
+        <div class="row">
+          <span><strong>Navegador padrão</strong><small id="default-status"></small></span>
+          <button id="make-default">Tornar padrão</button>
+        </div>
+        <div class="row">
           <span><strong>Continuar de onde parou</strong><small>Reabre as abas da última sessão ao iniciar o Kitty</small></span>
           <input type="checkbox" class="toggle" data-setting="restoreSession" />
-        </label>
-        <label class="row">
+        </div>
+        <div class="row">
           <span><strong>Vídeos e músicas protegidos</strong><small>Baixa do Google o Widevine, necessário para Netflix, Spotify, Crunchyroll e outros serviços com proteção contra cópia. Ao mudar, reinicie o Kitty.</small></span>
           <input type="checkbox" class="toggle" data-setting="widevine" />
-        </label>
+        </div>
+      </section>
+
+      <section id="aparencia">
+        <h2>Aparência</h2>
         <label class="row">
           <span><strong>Barra de favoritos</strong><small>Quando mostrar a barra com os favoritos, logo abaixo do endereço. ⇧⌘B alterna entre sempre e só na nova aba.</small></span>
           <select id="bookmarks-bar">
@@ -37,21 +57,17 @@
             <option value="vertical">Abas verticais</option>
           </select>
         </label>
-        <div class="row">
-          <span><strong>Navegador padrão</strong><small id="default-status"></small></span>
-          <button id="make-default">Tornar padrão</button>
-        </div>
       </section>
 
       <section id="importar">
-        <h2>Importar de outro navegador</h2>
+        <h2>Importar dados</h2>
         <label class="row">
           <span><strong>Navegador</strong><small id="import-hint">Traz favoritos e histórico salvos no computador. Nada é enviado pela internet.</small></span>
           <select id="import-source"></select>
         </label>
         <div class="checks">
-          <label><input type="checkbox" value="bookmarks" checked /> Favoritos</label>
-          <label><input type="checkbox" value="history" checked /> Histórico</label>
+          <span class="check"><input type="checkbox" value="bookmarks" checked aria-label="Favoritos" /> Favoritos</span>
+          <span class="check"><input type="checkbox" value="history" checked aria-label="Histórico" /> Histórico</span>
         </div>
         <p id="import-blocked" hidden>
           <span id="import-blocked-text"></span>
@@ -62,58 +78,58 @@
 
       <section id="senhas">
         <h2>Senhas</h2>
-        <label class="row">
+        <div class="row">
           <span><strong>Oferecer para salvar senhas</strong><small>Ao entrar num site, o Kitty pergunta se quer guardar a senha e preenche nas próximas visitas. As senhas ficam só neste computador, criptografadas pelo sistema. Nada é salvo em janelas privativas.</small></span>
           <input type="checkbox" class="toggle" data-setting="offerPasswords" />
-        </label>
+        </div>
         <div class="row">
           <span><strong>Senhas salvas</strong><small>Ver, copiar, editar e apagar</small></span>
           <a class="button" href="kitty://passwords">Gerenciar senhas</a>
         </div>
       </section>
 
-      <section>
+      <section id="busca">
         <h2>Busca</h2>
         <label class="row">
           <span><strong>Mecanismo de busca</strong><small>Usado na barra de endereço e na nova aba</small></span>
           <select id="engine"></select>
         </label>
-        <label class="row">
+        <div class="row">
           <span><strong>Sugestões de pesquisa</strong><small>Envia o que você digita ao buscador para sugerir termos. Nunca em janelas privativas.</small></span>
           <input type="checkbox" class="toggle" data-setting="searchSuggestions" />
-        </label>
+        </div>
       </section>
 
-      <section>
-        <h2>Privacidade e escudos</h2>
-        <label class="row">
+      <section id="privacidade">
+        <h2>Privacidade e segurança</h2>
+        <div class="row">
           <span><strong>Proteção contra sites perigosos</strong><small>Avisa antes de abrir sites de phishing (páginas falsas que roubam senhas) e de malware. A verificação é local: nenhum endereço que você visita é enviado a ninguém.</small></span>
           <input type="checkbox" class="toggle" data-setting="dangerousSiteProtection" />
-        </label>
-        <label class="row">
+        </div>
+        <div class="row">
           <span><strong>Remover rastreadores dos links</strong><small>Tira parâmetros como utm_source, fbclid e gclid dos endereços antes de abrir</small></span>
           <input type="checkbox" class="toggle" data-setting="stripTrackingParams" />
-        </label>
+        </div>
         <label class="row">
           <span><strong>DNS seguro</strong><small>Criptografa as consultas de DNS, para que seu provedor de internet não veja quais sites você acessa</small></span>
           <select id="dns"></select>
         </label>
-        <label class="row">
+        <div class="row">
           <span><strong>Atualizar conexões para HTTPS</strong><small>Abre sites por HTTPS sempre que possível; volta para HTTP só se o site não suportar</small></span>
           <input type="checkbox" class="toggle" data-setting="httpsUpgrade" />
-        </label>
-        <label class="row">
+        </div>
+        <div class="row">
           <span><strong>Bloquear cookies de terceiros</strong><small>Impede que sites embutidos (anúncios, botões sociais) rastreiem você entre sites. Ao mudar, reinicie o Kitty para valer por completo.</small></span>
           <input type="checkbox" class="toggle" data-setting="blockThirdPartyCookies" />
-        </label>
-        <label class="row">
+        </div>
+        <div class="row">
           <span><strong>Proteção contra fingerprinting</strong><small>Adiciona um ruído imperceptível a canvas, áudio e dados do hardware, diferente em cada site. Vale a partir da próxima página aberta.</small></span>
           <input type="checkbox" class="toggle" data-setting="antiFingerprinting" />
-        </label>
-        <label class="row">
+        </div>
+        <div class="row">
           <span><strong>Atualizar as listas de proteção sozinho</strong><small>Baixa versões novas das listas de anúncios e rastreadores (uma vez por dia) e de sites perigosos (a cada 6 horas). Desligado, o Kitty usa as listas que vieram com ele.</small></span>
           <input type="checkbox" class="toggle" data-setting="autoUpdateLists" />
-        </label>
+        </div>
         <div class="row">
           <span><strong>Listas de proteção</strong><small id="lists-status"></small></span>
           <button id="update-lists">Atualizar agora</button>
@@ -124,12 +140,12 @@
         </div>
       </section>
 
-      <section>
+      <section id="permissoes">
         <h2>Permissões de sites</h2>
         <div id="permissions"></div>
       </section>
 
-      <section>
+      <section id="downloads">
         <h2>Downloads</h2>
         <div class="row">
           <span><strong>Pasta</strong><small id="downloads-dir"></small></span>
@@ -137,24 +153,24 @@
         </div>
       </section>
 
-      <section>
+      <section id="limpar">
         <h2>Limpar dados de navegação</h2>
         <div class="checks" id="clear-kinds">
-          <label><input type="checkbox" value="history" checked /> Histórico</label>
-          <label><input type="checkbox" value="cookies" checked /> Cookies e dados de sites</label>
-          <label><input type="checkbox" value="cache" checked /> Imagens e arquivos em cache</label>
-          <label><input type="checkbox" value="downloads" /> Lista de downloads</label>
+          <span class="check"><input type="checkbox" value="history" checked aria-label="Histórico" /> Histórico</span>
+          <span class="check"><input type="checkbox" value="cookies" checked aria-label="Cookies e dados de sites" /> Cookies e dados de sites</span>
+          <span class="check"><input type="checkbox" value="cache" checked aria-label="Imagens e arquivos em cache" /> Imagens e arquivos em cache</span>
+          <span class="check"><input type="checkbox" value="downloads" aria-label="Lista de downloads" /> Lista de downloads</span>
         </div>
         <button id="clear" class="danger">Limpar dados</button>
         <span id="cleared" hidden>Pronto, dados apagados.</span>
       </section>
 
-      <section>
-        <h2>Atualizações</h2>
-        <label class="row" id="auto-update-row">
+      <section id="sobre">
+        <h2>Sobre o Kitty</h2>
+        <div class="row" id="auto-update-row">
           <span><strong>Atualizar o Kitty sozinho</strong><small>Procura versões novas no GitHub a cada 4 horas e instala quando você reinicia o Kitty</small></span>
           <input type="checkbox" class="toggle" data-setting="autoUpdate" />
-        </label>
+        </div>
         <div class="row">
           <span><strong>Kitty <span id="current-version"></span></strong><small id="update-status"></small></span>
           <button id="check-update">Procurar atualizações</button>
@@ -163,9 +179,8 @@
           <span><strong>Tela de boas-vindas</strong><small>Rever as escolhas do primeiro uso: buscador, atualizações e importação</small></span>
           <a class="button" href="kitty://setup">Abrir</a>
         </div>
+        <p class="about">Kitty <span id="version"></span> · feito com Chromium (Electron) e as listas EasyList, EasyPrivacy, malware-filter, URLhaus e uBlock Origin</p>
       </section>
-
-      <p class="about">Kitty <span id="version"></span> · feito com Chromium (Electron) e as listas EasyList, EasyPrivacy, malware-filter, URLhaus e uBlock Origin</p>
     </main>
     <script src="settings.js"></script>
   </body>

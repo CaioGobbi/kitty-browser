@@ -155,10 +155,14 @@ function newPrivateWindow(url) {
 /** Opens a kitty:// page, reusing a tab that already shows it. */
 function openInternal(url) {
   const kwin = registry.current() || newWindow();
-  const existing = kwin.order.find((id) => kwin.tabState(kwin.tabs.get(id)).url.startsWith(url));
+  // An open page is reused even when only the #section differs (kitty://settings#senhas).
+  const base = url.split('#')[0];
+  const existing = kwin.order.find((id) => kwin.tabState(kwin.tabs.get(id)).url.startsWith(base));
   if (existing != null) {
     kwin.switchTab(existing);
-    kwin.tabs.get(existing).view.webContents.reload();
+    const contents = kwin.tabs.get(existing).view.webContents;
+    if (url.includes('#')) contents.loadURL(url);
+    else contents.reload();
   } else {
     kwin.createTab(url);
   }
