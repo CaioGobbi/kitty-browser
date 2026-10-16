@@ -4,6 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Store } = require('./store');
+const { LANGUAGES } = require('../i18n');
 
 const SEARCH_ENGINES = {
   duckduckgo: {
@@ -42,6 +43,7 @@ const SETTING_DEFAULTS = {
   bookmarksBar: 'newtab', // 'always', 'newtab' (only on the new tab page) or 'never'
   tabLayout: 'classic', // 'classic' (tabs above the toolbar), 'compact' (one row) or 'vertical' (tabs on the side)
   verticalTabsCollapsed: false,
+  language: 'en', // interface language, from src/i18n
   theme: 'dark', // interface and kitty:// pages: 'dark', 'light' or 'system'
   restoreSession: true,
   httpsUpgrade: true,
@@ -83,6 +85,7 @@ const EDITABLE_SETTINGS = {
   bookmarksBar: (v) => BOOKMARKS_BAR.includes(v),
   tabLayout: (v) => TAB_LAYOUTS.includes(v),
   verticalTabsCollapsed: (v) => typeof v === 'boolean',
+  language: (v) => typeof v === 'string' && v in LANGUAGES,
   theme: (v) => ['dark', 'light', 'system'].includes(v),
   restoreSession: (v) => typeof v === 'boolean',
   httpsUpgrade: (v) => typeof v === 'boolean',

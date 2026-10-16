@@ -10,6 +10,7 @@
 // and can be empty.
 
 const { data } = require('./data');
+const { t } = require('../i18n');
 
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -107,8 +108,8 @@ function cleanUrl(url) {
 function add({ title, url, parentId, bar, beforeId } = {}) {
   const where = target(parentId, bar);
   const href = cleanUrl(url);
-  if (!where) return { error: 'Pasta não encontrada.' };
-  if (!href) return { error: 'Endereço inválido.' };
+  if (!where) return { error: t('Pasta não encontrada.') };
+  if (!href) return { error: t('Endereço inválido.') };
   const bookmark = { id: newId(), url: href, title: cleanTitle(title) || href, favicon: null, time: Date.now(), bar: where.bar, folder: where.path };
   insert(items(), [bookmark], beforeId);
   return { id: bookmark.id };
@@ -116,9 +117,9 @@ function add({ title, url, parentId, bar, beforeId } = {}) {
 
 function addFolder({ title, parentId, bar, beforeId } = {}) {
   const where = target(parentId, bar);
-  if (!where) return { error: 'Pasta não encontrada.' };
+  if (!where) return { error: t('Pasta não encontrada.') };
   const folder = { id: newId(), type: 'folder', title: '', folder: where.path, bar: where.bar, time: Date.now() };
-  folder.title = freeName(cleanTitle(title).slice(0, 100) || 'Nova pasta', where, folder);
+  folder.title = freeName(cleanTitle(title).slice(0, 100) || t('Nova pasta'), where, folder);
   insert(items(), [folder], beforeId);
   return { id: folder.id };
 }
@@ -134,7 +135,7 @@ function repath(folder, inside, oldPath, bar) {
 
 function update(id, { title, url } = {}) {
   const b = find(id);
-  if (!b) return { error: 'Favorito não encontrado.' };
+  if (!b) return { error: t('Favorito não encontrado.') };
   if (isFolder(b)) {
     const inside = descendants(b);
     const oldPath = pathOf(b);
@@ -142,7 +143,7 @@ function update(id, { title, url } = {}) {
     repath(b, inside, oldPath, onBar(b));
   } else {
     const href = url === undefined ? b.url : cleanUrl(url);
-    if (!href) return { error: 'Endereço inválido.' };
+    if (!href) return { error: t('Endereço inválido.') };
     if (href !== b.url) b.favicon = null;
     b.url = href;
     b.title = cleanTitle(title) || href;
@@ -163,9 +164,9 @@ function remove(id) {
 function move(id, { parentId, bar, beforeId } = {}) {
   const b = find(id);
   const where = target(parentId, bar);
-  if (!b || !where) return { error: 'Favorito não encontrado.' };
+  if (!b || !where) return { error: t('Favorito não encontrado.') };
   const inside = isFolder(b) ? descendants(b) : [];
-  if (parentId === id || inside.some((x) => x.id === parentId)) return { error: 'Uma pasta não pode ir para dentro dela mesma.' };
+  if (parentId === id || inside.some((x) => x.id === parentId)) return { error: t('Uma pasta não pode ir para dentro dela mesma.') };
   const moving = [b, ...inside];
   const oldPath = isFolder(b) ? pathOf(b) : null;
   const rest = items().filter((x) => !moving.includes(x));
@@ -185,7 +186,7 @@ const OPS = { add, addFolder, update, remove, move };
 /** Runs one editing operation sent by the bar or kitty://bookmarks. */
 function run(op) {
   const fn = OPS[op?.op];
-  if (!fn) return { error: 'Operação desconhecida.' };
+  if (!fn) return { error: t('Operação desconhecida.') };
   return op.op === 'remove' ? remove(op.id) : fn === add || fn === addFolder ? fn(op) : fn(op.id, op);
 }
 

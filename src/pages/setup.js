@@ -1,5 +1,8 @@
 'use strict';
 
+const t = window.kitty.t; // the interface language (src/i18n)
+window.kitty.translate(); // the static text, before this script reads or changes it
+
 // kitty://setup: the first page Kitty shows. Until the person finishes it,
 // Kitty makes no connection by itself (list and app updates, Widevine,
 // search suggestions); the choices made here release them.
@@ -7,11 +10,11 @@ const $ = (id) => document.getElementById(id);
 const settings = window.kitty.settings;
 
 const ENGINE_NOTES = {
-  duckduckgo: 'Não guarda o que você pesquisa',
-  brave: 'Índice próprio, não guarda o que você pesquisa',
-  startpage: 'Resultados do Google sem rastreamento (sem sugestões)',
-  ecosia: 'Usa a receita para plantar árvores',
-  google: 'Guarda o que você pesquisa para personalizar anúncios',
+  duckduckgo: t('Não guarda o que você pesquisa'),
+  brave: t('Índice próprio, não guarda o que você pesquisa'),
+  startpage: t('Resultados do Google sem rastreamento (sem sugestões)'),
+  ecosia: t('Usa a receita para plantar árvores'),
+  google: t('Guarda o que você pesquisa para personalizar anúncios'),
 };
 
 const steps = [...document.querySelectorAll('.step')];
@@ -37,16 +40,19 @@ function updateSuggest() {
   const hasSuggest = snapshot.engines.find((e) => e.id === chosenEngine())?.suggest;
   $('searchSuggestions').disabled = !hasSuggest;
   $('suggest-hint').textContent = hasSuggest
-    ? 'Envia ao buscador o que você digita na barra de endereço, para sugerir termos. Nunca em janelas privativas.'
-    : 'Este buscador não oferece sugestões.';
+    ? t('Envia ao buscador o que você digita na barra de endereço, para sugerir termos. Nunca em janelas privativas.')
+    : t('Este buscador não oferece sugestões.');
 }
 
 function render(s) {
   snapshot = s;
+  const language = $('language');
+  if (!language.options.length) language.append(...s.languages.map((l) => new Option(l.name, l.id)));
+  language.value = s.values.language;
   if (s.setup.for === 'update') {
-    $('welcome-title').textContent = 'O Kitty agora pergunta antes';
+    $('welcome-title').textContent = t('O Kitty agora pergunta antes');
     $('welcome-text').textContent =
-      'Nesta versão, nada se conecta sozinho sem a sua escolha. Suas escolhas atuais já vêm marcadas: é só conferir.';
+      t('Nesta versão, nada se conecta sozinho sem a sua escolha. Suas escolhas atuais já vêm marcadas: é só conferir.');
   }
 
   $('engines').replaceChildren(
@@ -78,15 +84,12 @@ function render(s) {
   $('widevine-later').hidden = s.widevineActive;
   $('update-row').hidden = !s.update.supported;
   $('update-note').hidden = s.update.supported;
-  $('update-note').textContent =
-    s.platform === 'darwin'
-      ? 'Atualizar o Kitty sozinho ainda não é possível no Mac (exige uma assinatura paga da Apple). As versões novas ficam no GitHub, para instalar manualmente.'
-      : 'A atualização automática do Kitty funciona só no app instalado.';
+  $('update-note').textContent = t('A atualização automática do Kitty funciona só no app instalado.');
 }
 
 // ---- Import (same flow as in Settings)
 const BLOCKED = 'blocked:';
-const PRIVACY_PATH = 'Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco';
+const PRIVACY_PATH = t('Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco');
 
 async function loadImportSources() {
   const { sources, blocked } = await settings.importSources();
@@ -103,8 +106,8 @@ async function loadImportSources() {
   const any = sources.length + blocked.length > 0;
   $('import-box').hidden = !any;
   $('import-hint').textContent = any
-    ? 'Copia favoritos e histórico salvos neste computador. Nada é enviado pela internet. Se não quiser, é só seguir.'
-    : 'Nenhum outro navegador encontrado neste computador. Dá para importar depois, em Configurações.';
+    ? t('Copia favoritos e histórico salvos neste computador. Nada é enviado pela internet. Se não quiser, é só seguir.')
+    : t('Nenhum outro navegador encontrado neste computador. Dá para importar depois, em Configurações.');
   updateImportChoice();
 }
 
@@ -114,9 +117,9 @@ function updateImportChoice() {
   $('import-blocked').hidden = !blockedName;
   if (blockedName) {
     $('import-blocked').textContent =
-      `O macOS não deixa o Kitty ler os dados do ${blockedName}. Para liberar, ative o Kitty em ${PRIVACY_PATH} e volte para esta tela.`;
+      t('O macOS não deixa o Kitty ler os dados do {browser}. Para liberar, ative o Kitty em {path} e volte para esta tela.', { browser: blockedName, path: PRIVACY_PATH });
   }
-  $('import').textContent = blockedName ? 'Dar permissão' : 'Importar';
+  $('import').textContent = blockedName ? t('Dar permissão') : t('Importar');
   $('import').disabled = !value;
 }
 
@@ -132,21 +135,21 @@ $('import').addEventListener('click', async (e) => {
   if (!kinds.length) return;
   const status = $('import-status');
   e.target.disabled = true;
-  status.textContent = 'Importando…';
+  status.textContent = t('Importando…');
   const r = await settings.importRun($('import-source').value, kinds);
   e.target.disabled = false;
   if (!r || r.error) {
-    status.textContent = r?.error || 'Não foi possível importar.';
+    status.textContent = r?.error || t('Não foi possível importar.');
     return;
   }
   if (!r.bookmarks && !r.history) {
-    status.textContent = 'Nada novo para importar.';
+    status.textContent = t('Nada novo para importar.');
     return;
   }
   const parts = [];
-  if (kinds.includes('bookmarks')) parts.push(`${r.bookmarks} ${r.bookmarks === 1 ? 'favorito' : 'favoritos'}`);
-  if (kinds.includes('history')) parts.push(`${r.history} ${r.history === 1 ? 'página' : 'páginas'} do histórico`);
-  status.textContent = `Pronto: ${parts.join(' e ')}.`;
+  if (kinds.includes('bookmarks')) parts.push(r.bookmarks === 1 ? t('1 favorito') : t('{n} favoritos', { n: r.bookmarks }));
+  if (kinds.includes('history')) parts.push(r.history === 1 ? t('1 página do histórico') : t('{n} páginas do histórico', { n: r.history }));
+  status.textContent = t('Importado: {what}.', { what: parts.join(` ${t('e')} `) });
 });
 
 $('finish').addEventListener('click', async (e) => {
@@ -160,6 +163,9 @@ $('finish').addEventListener('click', async (e) => {
   });
   location.replace('kitty://newtab');
 });
+
+// Kitty reloads this page in the new language.
+$('language').addEventListener('change', (e) => settings.set('language', e.target.value));
 
 settings.get().then((s) => {
   render(s);

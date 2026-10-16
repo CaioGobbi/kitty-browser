@@ -14,6 +14,7 @@ const webStore = require('electron-chrome-web-store');
 const api = require('./extension-api');
 const { data, allowed } = require('./data');
 const { registry } = require('./registry');
+const { t } = require('../i18n');
 
 const WEB_STORE = 'https://chromewebstore.google.com/';
 const UPDATE_EVERY = 5 * 60 * 60 * 1000;
@@ -96,20 +97,23 @@ function warnings(manifest) {
   for (const cs of manifest.content_scripts || []) hosts.push(...(cs.matches || []));
   const out = [];
   const everywhere = hosts.some((h) => h === '<all_urls>' || /^(\*|https?):\/\/\*\//.test(h));
-  if (everywhere) out.push('Ler e alterar todos os seus dados em todos os sites');
+  if (everywhere) out.push(t('Ler e alterar todos os seus dados em todos os sites'));
   else if (hosts.length) {
     const names = [...new Set(hosts.map((h) => (/^[^:]+:\/\/([^/]+)/.exec(h) || [])[1]).filter(Boolean))];
-    out.push(`Ler e alterar seus dados em ${names.slice(0, 4).join(', ')}${names.length > 4 ? ` e mais ${names.length - 4} sites` : ''}`);
+    const sites = names.slice(0, 4).join(', ');
+    out.push(names.length > 4
+      ? t('Ler e alterar seus dados em {sites} e mais {n} sites', { sites, n: names.length - 4 })
+      : t('Ler e alterar seus dados em {sites}', { sites }));
   }
-  if (perms.has('tabs') || perms.has('webNavigation') || perms.has('history')) out.push('Ler seu histórico de navegação');
-  if (perms.has('bookmarks')) out.push('Ler e alterar seus favoritos');
-  if (perms.has('clipboardRead')) out.push('Ler dados que você copia e cola');
-  if (perms.has('clipboardWrite')) out.push('Alterar dados que você copia e cola');
-  if (perms.has('downloads')) out.push('Gerenciar seus downloads');
-  if (perms.has('notifications')) out.push('Mostrar notificações');
-  if (perms.has('privacy')) out.push('Alterar configurações de privacidade');
-  if (perms.has('management')) out.push('Gerenciar suas extensões');
-  if (perms.has('nativeMessaging')) out.push('Se comunicar com aplicativos instalados (não funciona no Kitty)');
+  if (perms.has('tabs') || perms.has('webNavigation') || perms.has('history')) out.push(t('Ler seu histórico de navegação'));
+  if (perms.has('bookmarks')) out.push(t('Ler e alterar seus favoritos'));
+  if (perms.has('clipboardRead')) out.push(t('Ler dados que você copia e cola'));
+  if (perms.has('clipboardWrite')) out.push(t('Alterar dados que você copia e cola'));
+  if (perms.has('downloads')) out.push(t('Gerenciar seus downloads'));
+  if (perms.has('notifications')) out.push(t('Mostrar notificações'));
+  if (perms.has('privacy')) out.push(t('Alterar configurações de privacidade'));
+  if (perms.has('management')) out.push(t('Gerenciar suas extensões'));
+  if (perms.has('nativeMessaging')) out.push(t('Se comunicar com aplicativos instalados (não funciona no Kitty)'));
   return out;
 }
 
@@ -121,11 +125,11 @@ async function confirmInstall({ id, localizedName, manifest, icon, frame }) {
   const list = warnings(manifest);
   const options = {
     type: 'question',
-    buttons: ['Adicionar extensão', 'Cancelar'],
+    buttons: [t('Adicionar extensão'), t('Cancelar')],
     defaultId: 0,
     cancelId: 1,
-    message: `Adicionar “${localizedName}” ao Kitty?`,
-    detail: `${list.length ? `Ela poderá:\n${list.map((w) => `•  ${w}`).join('\n')}\n\n` : ''}O Kitty roda extensões do Chrome com algumas limitações: se algo não funcionar, dá para desligá-la ou removê-la em Extensões.`,
+    message: t('Adicionar “{name}” ao Kitty?', { name: localizedName }),
+    detail: `${list.length ? `${t('Ela poderá:')}\n${list.map((w) => `•  ${w}`).join('\n')}\n\n` : ''}${t('O Kitty roda extensões do Chrome com algumas limitações: se algo não funcionar, dá para desligá-la ou removê-la em Extensões.')}`,
   };
   if (icon && !icon.isEmpty()) options.icon = icon.resize({ width: 64, height: 64 });
   const { response } = kwin ? await dialog.showMessageBox(kwin.win, options) : await dialog.showMessageBox(options);
@@ -198,11 +202,11 @@ async function confirmUninstall(kwin, id) {
   if (!item) return;
   const { response } = await dialog.showMessageBox(kwin.win, {
     type: 'warning',
-    buttons: ['Remover', 'Cancelar'],
+    buttons: [t('Remover'), t('Cancelar')],
     defaultId: 0,
     cancelId: 1,
-    message: `Remover “${item.name}”?`,
-    detail: 'A extensão e os dados que ela guardou no Kitty serão apagados.',
+    message: t('Remover “{name}”?', { name: item.name }),
+    detail: t('A extensão e os dados que ela guardou no Kitty serão apagados.'),
   });
   if (response === 0) await uninstall(id);
 }
@@ -241,11 +245,11 @@ function actionMenu(kwin, id) {
   const template = [{ label: ext.name, enabled: false }, ...api.contextMenuItems({ kwin, tab, target: 'action', onlyExt: id })];
   template.push(
     { type: 'separator' },
-    { label: pinned ? 'Desafixar da barra' : 'Fixar na barra', click: () => setPinned(id, !pinned) },
-    { label: 'Opções', enabled: !!api.optionsPage(ext), click: () => api.openOptions(ext) },
-    { label: 'Gerenciar extensões', click: () => hooks.openInternal('kitty://extensions') },
+    { label: pinned ? t('Desafixar da barra') : t('Fixar na barra'), click: () => setPinned(id, !pinned) },
+    { label: t('Opções'), enabled: !!api.optionsPage(ext), click: () => api.openOptions(ext) },
+    { label: t('Gerenciar extensões'), click: () => hooks.openInternal('kitty://extensions') },
     { type: 'separator' },
-    { label: 'Remover do Kitty…', click: () => confirmUninstall(kwin, id) },
+    { label: t('Remover do Kitty…'), click: () => confirmUninstall(kwin, id) },
   );
   Menu.buildFromTemplate(template).popup({ window: kwin.win });
 }

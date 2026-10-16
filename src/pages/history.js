@@ -1,18 +1,21 @@
 'use strict';
 
+const t = window.kitty.t; // the interface language (src/i18n)
+window.kitty.translate(); // the static text, before this script reads or changes it
+
 const list = document.getElementById('list');
 const empty = document.getElementById('empty');
 const filter = document.getElementById('filter');
 
-const dayFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const dayFmt = new Intl.DateTimeFormat(window.kitty.lang, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const timeFmt = new Intl.DateTimeFormat(window.kitty.lang, { hour: '2-digit', minute: '2-digit' });
 
 function dayLabel(date) {
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return 'Hoje';
-  if (date.toDateString() === yesterday.toDateString()) return 'Ontem';
+  if (date.toDateString() === today.toDateString()) return t('Hoje');
+  if (date.toDateString() === yesterday.toDateString()) return t('Ontem');
   return dayFmt.format(date);
 }
 
@@ -51,7 +54,7 @@ async function render() {
     link.append(title, host);
 
     const remove = document.createElement('button');
-    remove.title = 'Remover do histórico';
+    remove.title = t('Remover do histórico');
     remove.textContent = '✕';
     remove.addEventListener('click', async () => {
       await window.kitty.removeHistory(entry.time);
@@ -70,7 +73,7 @@ filter.addEventListener('input', () => {
 });
 
 document.getElementById('clear').addEventListener('click', async () => {
-  if (!confirm('Apagar todo o histórico de navegação?')) return;
+  if (!confirm(t('Apagar todo o histórico de navegação?'))) return;
   await window.kitty.clearHistory();
   render();
 });

@@ -1,5 +1,8 @@
 'use strict';
 
+const t = window.kitty.t; // the interface language (src/i18n)
+window.kitty.translate(); // the static text, before this script reads or changes it
+
 const $ = (id) => document.getElementById(id);
 const api = window.kitty.extensions;
 
@@ -34,18 +37,18 @@ function render(snapshot) {
       const name = make('div', 'name', ext.name);
       name.append(make('span', 'version', ext.version));
       const actions = make('div', 'actions');
-      if (ext.enabled && ext.hasOptions) actions.append(button('Opções', () => api.options(ext.id)));
-      if (ext.enabled) actions.append(button(ext.pinned ? 'Desafixar da barra' : 'Fixar na barra', async () => render(await api.pin(ext.id, !ext.pinned))));
+      if (ext.enabled && ext.hasOptions) actions.append(button(t('Opções'), () => api.options(ext.id)));
+      if (ext.enabled) actions.append(button(ext.pinned ? t('Desafixar da barra') : t('Fixar na barra'), async () => render(await api.pin(ext.id, !ext.pinned))));
       actions.append(
-        button('Remover', async () => {
-          if (confirm(`Remover “${ext.name}”? A extensão e os dados que ela guardou serão apagados.`)) render(await api.remove(ext.id));
+        button(t('Remover'), async () => {
+          if (confirm(t('Remover “{name}”? A extensão e os dados que ela guardou serão apagados.', { name: ext.name }))) render(await api.remove(ext.id));
         }, 'danger'),
       );
       info.append(name, make('div', 'desc', ext.description), actions);
       const toggle = make('input', 'toggle');
       toggle.type = 'checkbox';
       toggle.checked = ext.enabled;
-      toggle.title = ext.enabled ? 'Desligar' : 'Ligar';
+      toggle.title = ext.enabled ? t('Desligar') : t('Ligar');
       toggle.addEventListener('change', async () => render(await api.enable(ext.id, toggle.checked)));
       card.append(icon, info, toggle);
       return card;
@@ -58,10 +61,10 @@ $('auto').addEventListener('change', async () => render(await api.setAutoUpdate(
 $('update').addEventListener('click', async (e) => {
   e.preventDefault();
   $('update').disabled = true;
-  $('update').textContent = 'Procurando…';
+  $('update').textContent = t('Procurando…');
   render(await api.update());
   $('update').disabled = false;
-  $('update').textContent = 'Procurar atualizações';
+  $('update').textContent = t('Procurar atualizações');
 });
 api.list().then(render);
 // Installs and removals from elsewhere (the toolbar, the Web Store).

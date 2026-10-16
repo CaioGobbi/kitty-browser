@@ -10,6 +10,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { t } = require('../i18n');
 
 const HISTORY_LIMIT = 5000; // same as window.js
 const ICON_MAX_BYTES = 64 * 1024;
@@ -269,7 +270,7 @@ function chromiumBookmarks(dir, tmp) {
     if (node.type === 'url' && isWeb(node.url)) {
       found.push({ url: node.url, title: node.name || node.url, time: chromeTime(node.date_added), bar, folder });
     }
-    const inner = node.type === 'folder' && folder ? [...folder, node.name || 'Sem nome'] : [];
+    const inner = node.type === 'folder' && folder ? [...folder, node.name || t('Sem nome')] : [];
     for (const child of node.children || []) walk(child, bar, inner);
   };
   for (const file of CHROMIUM_BOOKMARK_FILES) {
@@ -343,7 +344,7 @@ function firefoxBookmarks(dir, tmp) {
       for (const r of children.get(id) || []) {
         if (seen.has(r.id)) continue;
         seen.add(r.id);
-        if (r.type === 2) walk(r.id, bar, [...folder, r.title || 'Sem nome']);
+        if (r.type === 2) walk(r.id, bar, [...folder, r.title || t('Sem nome')]);
         else if (isWeb(r.url)) {
           found.push({
             url: r.url,
@@ -467,7 +468,7 @@ function mergeHistory(store, incoming) {
  */
 function importFrom(id, kinds, stores) {
   const source = listSources().find((s) => s.id === id);
-  if (!source) throw new Error('Navegador não encontrado.');
+  if (!source) throw new Error(t('Navegador não encontrado.'));
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kitty-import-'));
   const chromium = source.type === 'chromium';
   try {
@@ -484,7 +485,7 @@ function importFrom(id, kinds, stores) {
     };
   } catch (err) {
     if (err instanceof BrowserLockedError) {
-      throw new Error(`Não foi possível ler os dados. Feche o ${source.name.replace(/ \(.*/, '')} e tente de novo.`);
+      throw new Error(t('Não foi possível ler os dados. Feche o {browser} e tente de novo.', { browser: source.name.replace(/ \(.*/, '') }));
     }
     throw err;
   } finally {

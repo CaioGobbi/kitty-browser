@@ -7,6 +7,7 @@ const { BaseWindow, WebContentsView, nativeTheme, session } = require('electron'
 
 const { data, searchUrl, isInternal, isShieldUp, isBookmarked, originOf } = require('./data');
 const { registry } = require('./registry');
+const { t } = require('../i18n');
 const { httpFallbackFor } = require('./privacy');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
@@ -86,7 +87,7 @@ class KittyWindow {
       show: !adopt, // shown without focus, so the drag carrying it goes on
       minWidth: 480,
       minHeight: 320,
-      title: isPrivate ? 'Kitty — Janela privativa' : 'Kitty',
+      title: isPrivate ? t('Kitty — Janela privativa') : 'Kitty',
       backgroundColor: isPrivate ? '#1a1326' : nativeTheme.shouldUseDarkColors ? '#17151c' : '#f6f4f9',
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
       trafficLightPosition: { x: 14, y: 13 },
@@ -174,7 +175,7 @@ class KittyWindow {
     const prompt = tab.prompts[0];
     return {
       id: tab.id,
-      title: (tab.pendingUrl ? tab.pendingTitle : wc.getTitle()) || (internal ? 'Nova aba' : url),
+      title: (tab.pendingUrl ? tab.pendingTitle : wc.getTitle()) || (internal ? t('Nova aba') : url),
       url,
       favicon: tab.favicon,
       loading: !tab.pendingUrl && wc.isLoading(),

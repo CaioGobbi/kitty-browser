@@ -21,6 +21,8 @@ const extensions = require('./extensions');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 const tabdrag = require('./tabdrag');
+const i18n = require('../i18n');
+const { t } = i18n;
 
 app.setName('Kitty');
 // A throwaway profile for development and tests: KITTY_PROFILE=/tmp/x npm start
@@ -34,6 +36,7 @@ if (!isPrimaryInstance) app.quit();
 
 // Settings are read before startup: some only apply as Chromium switches.
 initData(app.getPath('userData'));
+i18n.setLanguage(data.settings.get('language'));
 bookmarkEdits.ensureFolders(); // folders of older imports become items
 if (data.settings.get('blockThirdPartyCookies')) {
   // Chromium's own third-party cookie blocking (the one Chrome is testing).
@@ -101,6 +104,19 @@ function cleanUserAgent(ua) {
 function applyTheme() {
   const theme = data.settings.get('theme');
   nativeTheme.themeSource = ['dark', 'light', 'system'].includes(theme) ? theme : 'dark';
+}
+
+/** Switches the interface language: menus are rebuilt, and the browser UI and kitty:// pages reload. */
+function applyLanguage() {
+  i18n.setLanguage(data.settings.get('language'));
+  menus.buildAppMenu();
+  for (const w of registry.windows) {
+    w.ui.webContents.reload();
+    for (const tab of w.tabs.values()) {
+      const wc = tab.view.webContents;
+      if (isInternal(wc.getURL())) wc.reload();
+    }
+  }
 }
 
 function applyDns() {
@@ -345,7 +361,8 @@ function settingsSnapshot() {
   return {
     values: Object.fromEntries(Object.keys(EDITABLE_SETTINGS).map((k) => [k, s.get(k)])),
     engines: Object.entries(SEARCH_ENGINES).map(([id, e]) => ({ id, name: e.name, suggest: !!e.suggest })),
-    dnsProviders: Object.entries(DNS_PROVIDERS).map(([id, p]) => ({ id, name: p.name })),
+    dnsProviders: Object.entries(DNS_PROVIDERS).map(([id, p]) => ({ id, name: t(p.name) })),
+    languages: Object.entries(i18n.LANGUAGES).map(([id, name]) => ({ id, name })),
     lists: lists.status(),
     allowlist: s.get('allowlist'),
     permissions: privacy.permissionList(),
@@ -403,6 +420,10 @@ function fromPage(event, ...hosts) {
 }
 
 function registerIpc() {
+  ipcMain.on('i18n:get', (event) => {
+    event.returnValue = i18n.snapshot();
+  });
+
   // ---- Browser UI (tab strip, toolbar, bars). Each call targets its window.
   const ui = (channel, fn) =>
     ipcMain.on(channel, (event, ...args) => {
@@ -544,8 +565,11 @@ function registerIpc() {
     return settingsSnapshot();
   });
   ipcMain.handle('kitty:settings-set', (event, key, value) => {
-    if (!fromPage(event, 'settings') || !EDITABLE_SETTINGS[key]?.(value)) return settingsSnapshot();
+    // The welcome page only chooses the language; the rest waits for "Começar a navegar".
+    const page = key === 'language' ? fromPage(event, 'settings', 'setup') : fromPage(event, 'settings');
+    if (!page || !EDITABLE_SETTINGS[key]?.(value)) return settingsSnapshot();
     data.settings.set(key, value);
+    if (key === 'language') applyLanguage();
     if (key === 'secureDns') applyDns();
     if (key === 'theme') applyTheme();
     if (['tabLayout', 'bookmarksBar'].includes(key)) menus.buildAppMenu();
@@ -637,7 +661,7 @@ async function setupWidevine(enabled) {
  * restored tabs) and makes no connection by itself.
  */
 function withSetupTab(saved) {
-  const setupTab = { url: SETUP_URL, title: 'Boas-vindas ao Kitty' };
+  const setupTab = { url: SETUP_URL, title: t('Boas-vindas ao Kitty') };
   if (!saved.length) saved.push({ tabs: [] });
   const tabs = saved[0].tabs;
   const index = tabs.findIndex((t) => t.url?.startsWith(SETUP_URL));

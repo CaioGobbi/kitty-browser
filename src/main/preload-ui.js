@@ -5,9 +5,43 @@ const { contextBridge, ipcRenderer } = require('electron');
 const send = (channel) => (...args) => ipcRenderer.send(channel, ...args);
 const on = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload) => cb(payload));
 
+// Interface language (src/i18n): the same t() as the main process, and the
+// static HTML translated as it loads.
+const i18n = ipcRenderer.sendSync('i18n:get');
+const t = (text, vars) => {
+  const out = Object.hasOwn(i18n.dict, text) ? i18n.dict[text] : text;
+  return vars ? out.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : out;
+};
+let translatedDocument = false; // the page's script may do it first, before changing the text
+function translate(root) {
+  if (root === document) translatedDocument = true;
+  const lookup = (s) => {
+    const key = s.trim().replace(/\s+/g, ' ');
+    return key && Object.hasOwn(i18n.dict, key) ? i18n.dict[key] : null;
+  };
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const out = lookup(node.nodeValue);
+    if (out !== null) node.nodeValue = node.nodeValue.replace(/\S[\s\S]*\S|\S/, () => out);
+  }
+  for (const attr of ['title', 'placeholder', 'aria-label', 'alt']) {
+    for (const el of root.querySelectorAll(`[${attr}]`)) {
+      const out = lookup(el.getAttribute(attr));
+      if (out !== null) el.setAttribute(attr, out);
+    }
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.lang = i18n.lang;
+  if (!translatedDocument) translate(document);
+});
+
 contextBridge.exposeInMainWorld('kittyUI', {
   isPrivate: new URLSearchParams(location.search).get('private') === '1',
   platform: process.platform,
+  lang: i18n.lang,
+  t,
+  translate: () => translate(document), // DOM nodes can't cross the bridge
 
   ready: send('ui:ready'),
   setChrome: send('ui:chrome'),

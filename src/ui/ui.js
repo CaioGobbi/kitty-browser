@@ -1,7 +1,21 @@
 'use strict';
 
 const api = window.kittyUI;
+const t = api.t; // the interface language (src/i18n)
+api.translate(); // now, before the shortcuts in tooltips are rewritten below
 const $ = (id) => document.getElementById(id);
+
+/** A translated text whose {placeholders} become the given nodes or strings. */
+function richText(template, parts) {
+  return template
+    .split(/(\{\w+\})/)
+    .filter(Boolean)
+    .map((piece) => {
+      const value = parts[/^\{(\w+)\}$/.exec(piece)?.[1]];
+      if (value instanceof Node) return value;
+      return document.createTextNode(value ?? piece);
+    });
+}
 
 const chrome = $('chrome');
 const tabstrip = $('tabstrip');
@@ -122,7 +136,7 @@ function applyLayout() {
   const collapsed = layout === 'vertical' && !!uiSettings.verticalTabsCollapsed;
   document.body.classList.toggle('sidebar-collapsed', collapsed);
   const collapseBtn = $('sidebar-collapse');
-  collapseBtn.title = collapsed ? 'Expandir abas' : 'Recolher abas';
+  collapseBtn.title = collapsed ? t('Expandir abas') : t('Recolher abas');
   collapseBtn.setAttribute('aria-label', collapseBtn.title);
   if (layout !== tabLayout) {
     const typing = document.activeElement === address;
@@ -346,7 +360,7 @@ function renderTabs() {
       const audio = node.querySelector('.tab-audio');
       audio.hidden = !tab.audible && !tab.muted;
       audio.innerHTML = tab.muted ? ICONS.muted : ICONS.audio;
-      audio.title = tab.muted ? 'Ativar som da aba' : 'Silenciar aba';
+      audio.title = tab.muted ? t('Ativar som da aba') : t('Silenciar aba');
 
       const iconKey = tab.loading ? 'loading' : tab.internal ? 'kitty' : tab.favicon || 'none';
       const icon = node.querySelector('.tab-icon');
@@ -381,7 +395,7 @@ function createTabNode(id) {
   const node = el('div', 'tab');
   node.dataset.id = id;
   node.setAttribute('role', 'tab');
-  node.innerHTML = `<span class="tab-icon"></span><span class="tab-title"></span><button class="tab-audio" hidden></button><button class="tab-close" aria-label="Fechar aba">${ICONS.close}</button>`;
+  node.innerHTML = `<span class="tab-icon"></span><span class="tab-title"></span><button class="tab-audio" hidden></button><button class="tab-close" aria-label="${t('Fechar aba')}">${ICONS.close}</button>`;
   node.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || e.target.closest('button')) return;
     api.switchTab(id);
@@ -533,10 +547,10 @@ function renderToolbar() {
   $('back').disabled = !tab?.canGoBack;
   $('forward').disabled = !tab?.canGoForward;
   reloadBtn.classList.toggle('loading', !!tab?.loading);
-  reloadBtn.title = tab?.loading ? 'Parar' : keys('Recarregar (⌘R)');
+  reloadBtn.title = tab?.loading ? t('Parar') : keys(t('Recarregar (⌘R)'));
 
   if (!editing) address.value = displayUrl(tab);
-  address.placeholder = `Pesquise com ${uiSettings.engineName} ou digite um endereço`;
+  address.placeholder = t('Pesquise com {engine} ou digite um endereço', { engine: uiSettings.engineName });
   const kind = !tab || tab.internal ? 'kitty' : tab.url.startsWith('https:') ? 'lock' : tab.url.startsWith('http:') ? 'insecure' : 'search';
   siteIcon.dataset.kind = kind;
   addressForm.dataset.kind = kind;
@@ -544,17 +558,17 @@ function renderToolbar() {
   const web = tab && /^https?:/.test(tab.url);
   starBtn.hidden = !web;
   starBtn.classList.toggle('on', !!tab?.bookmarked);
-  starBtn.title = keys(tab?.bookmarked ? 'Remover dos favoritos (⌘D)' : 'Adicionar aos favoritos (⌘D)');
+  starBtn.title = keys(tab?.bookmarked ? t('Remover dos favoritos (⌘D)') : t('Adicionar aos favoritos (⌘D)'));
 
   const shieldable = tab && !tab.internal;
   shieldBtn.disabled = !shieldable;
   shieldBtn.classList.toggle('down', !!shieldable && !tab.shieldUp);
   shieldCount.textContent = shieldable && tab.shieldUp && tab.blocked > 0 ? String(tab.blocked) : '';
   shieldBtn.title = !shieldable
-    ? 'Escudos do Kitty'
+    ? t('Escudos do Kitty')
     : tab.shieldUp
-      ? `Escudos ativos — ${tab.blocked} anúncio(s) e rastreador(es) bloqueado(s). Clique para desativar neste site.`
-      : 'Escudos desativados neste site. Clique para reativar.';
+      ? t('Escudos ativos: {n} anúncio(s) e rastreador(es) bloqueado(s). Clique para desativar neste site.', { n: tab.blocked })
+      : t('Escudos desativados neste site. Clique para reativar.');
 
   renderPermission(tab);
   renderPasswordOffer(tab);
@@ -653,11 +667,11 @@ function renderSuggestions(items, text) {
       row.setAttribute('role', 'option');
       let icon = ICONS.search;
       let main = item.text;
-      let sub = item.typed ? `Pesquisar no ${uiSettings.engineName}` : '';
+      let sub = item.typed ? t('Pesquisar no {engine}', { engine: uiSettings.engineName }) : '';
       if (item.type === 'url') {
         icon = ICONS.globe;
         main = item.url;
-        sub = 'Abrir endereço';
+        sub = t('Abrir endereço');
       } else if (item.type === 'history' || item.type === 'bookmark') {
         icon = item.type === 'bookmark' ? ICONS.star : ICONS.history;
         main = item.title || item.url;
@@ -809,7 +823,7 @@ function renderFolderPanel() {
     }
     rows.push(row);
   }
-  if (!kids.length) rows.push(el('div', 'folder-empty', 'Pasta vazia'));
+  if (!kids.length) rows.push(el('div', 'folder-empty', t('Pasta vazia')));
   folderPanel.replaceChildren(...rows);
 }
 
@@ -899,8 +913,8 @@ let dialogState = null;
 api.onBookmarkDialog((d) => {
   dialogState = d;
   const withUrl = d.mode === 'edit' || d.mode === 'add';
-  $('bd-heading').textContent = DIALOG_TITLES[d.mode] ?? 'Favorito';
-  $('bd-name').value = d.title || (d.mode === 'folder' ? 'Nova pasta' : '');
+  $('bd-heading').textContent = t(DIALOG_TITLES[d.mode] ?? 'Favorito');
+  $('bd-name').value = d.title || (d.mode === 'folder' ? t('Nova pasta') : '');
   $('bd-url').value = d.url || '';
   $('bd-url-row').hidden = !withUrl;
   $('bd-error').hidden = true;
@@ -945,7 +959,7 @@ function renderPermission(tab) {
   if (!prompt) return;
   const host = prompt.origin.replace(/^https?:\/\//, '');
   const text = $('perm-text');
-  text.replaceChildren(el('strong', '', host), document.createTextNode(` quer ${prompt.label}.`));
+  text.replaceChildren(...richText(t('{site} quer {action}.'), { site: el('strong', '', host), action: prompt.label }));
   permBar.dataset.tabId = tab.id;
   permBar.dataset.promptId = prompt.id;
 }
@@ -966,11 +980,11 @@ function renderPasswordOffer(tab) {
   pwBar.hidden = !offer;
   if (!offer) return;
   const host = offer.origin.replace(/^https?:\/\//, '');
-  const text = [document.createTextNode(offer.update ? 'Atualizar a senha salva' : 'Salvar a senha')];
-  if (offer.username) text.push(document.createTextNode(' de '), el('strong', '', offer.username));
-  text.push(document.createTextNode(' em '), el('strong', '', host), document.createTextNode('?'));
-  $('pw-text').replaceChildren(...text);
-  $('pw-save').textContent = offer.update ? 'Atualizar' : 'Salvar';
+  const question = offer.username
+    ? offer.update ? t('Atualizar a senha salva de {user} em {site}?') : t('Salvar a senha de {user} em {site}?')
+    : offer.update ? t('Atualizar a senha salva em {site}?') : t('Salvar a senha em {site}?');
+  $('pw-text').replaceChildren(...richText(question, { user: el('strong', '', offer.username), site: el('strong', '', host) }));
+  $('pw-save').textContent = offer.update ? t('Atualizar') : t('Salvar');
   pwBar.dataset.tabId = tab.id;
   pwBar.dataset.offerId = offer.id;
 }
@@ -1020,7 +1034,7 @@ api.onFindClose(() => {
 });
 api.onFindStep(stepFind);
 api.onFindResult(({ active, matches }) => {
-  findCount.textContent = findInput.value ? (matches ? `${active} de ${matches}` : 'Nenhum resultado') : '';
+  findCount.textContent = findInput.value ? (matches ? t('{n} de {total}', { n: active, total: matches }) : t('Nenhum resultado')) : '';
   findInput.classList.toggle('none', !!findInput.value && matches === 0);
 });
 
@@ -1037,20 +1051,20 @@ function formatBytes(n) {
 function downloadStatus(d) {
   switch (d.state) {
     case 'progressing': {
-      if (d.paused) return `Pausado · ${formatBytes(d.received)}${d.total ? ` de ${formatBytes(d.total)}` : ''}`;
+      const of = d.total ? ` ${t('de')} ${formatBytes(d.total)}` : '';
+      if (d.paused) return `${t('Pausado')} · ${formatBytes(d.received)}${of}`;
       const elapsed = (Date.now() - d.startTime) / 1000;
       const speed = elapsed > 0.5 ? d.received / elapsed : 0;
-      const of = d.total ? ` de ${formatBytes(d.total)}` : '';
       return `${formatBytes(d.received)}${of}${speed ? ` · ${formatBytes(speed)}/s` : ''}`;
     }
     case 'completed':
-      return `Concluído · ${formatBytes(d.received || d.total)}`;
+      return `${t('Concluído')} · ${formatBytes(d.received || d.total)}`;
     case 'cancelled':
-      return 'Cancelado';
+      return t('Cancelado');
     case 'removed':
-      return 'Arquivo removido';
+      return t('Arquivo removido');
     default:
-      return 'Falhou';
+      return t('Falhou');
   }
 }
 
@@ -1081,7 +1095,7 @@ function renderDownloads() {
   downloadsBtn.style.setProperty('--progress', total ? String(received / total) : '0.1');
 
   const list = $('downloads-list');
-  if (!downloads.length) return list.replaceChildren(el('div', 'empty', 'Nenhum download por aqui.'));
+  if (!downloads.length) return list.replaceChildren(el('div', 'empty', t('Nenhum download por aqui.')));
   list.replaceChildren(
     ...downloads.map((d) => {
       const row = el('div', 'download');
@@ -1109,12 +1123,12 @@ function renderDownloads() {
         actions.push(b);
       };
       if (d.state === 'progressing') {
-        if (d.paused) action(ICONS.play, 'Continuar', 'resume');
-        else action(ICONS.pause, 'Pausar', 'pause');
-        action(ICONS.close, 'Cancelar', 'cancel');
+        if (d.paused) action(ICONS.play, t('Continuar'), 'resume');
+        else action(ICONS.pause, t('Pausar'), 'pause');
+        action(ICONS.close, t('Cancelar'), 'cancel');
       } else {
-        if (done) action(ICONS.folder, isMac ? 'Mostrar no Finder' : 'Mostrar na pasta', 'show');
-        action(ICONS.close, 'Remover da lista', 'remove');
+        if (done) action(ICONS.folder, isMac ? t('Mostrar no Finder') : t('Mostrar na pasta'), 'show');
+        action(ICONS.close, t('Remover da lista'), 'remove');
       }
       row.append(el('div', 'file-icon', ext), info, ...actions);
       return row;
@@ -1196,7 +1210,7 @@ api.onFocusAddress(() => {
 const updateBtn = $('update-btn');
 api.onUpdate((update) => {
   updateBtn.hidden = update.status !== 'ready';
-  updateBtn.title = `Kitty ${update.available} foi baixado. Clique para reiniciar e atualizar — suas abas voltam abertas.`;
+  updateBtn.title = t('Kitty {version} foi baixado. Clique para reiniciar e atualizar. Suas abas voltam abertas.', { version: update.available });
 });
 updateBtn.addEventListener('click', () => api.installUpdate());
 

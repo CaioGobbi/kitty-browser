@@ -1,5 +1,8 @@
 'use strict';
 
+const t = window.kitty.t; // the interface language (src/i18n)
+window.kitty.translate(); // the static text, before this script reads or changes it
+
 const $ = (id) => document.getElementById(id);
 const api = window.kitty.passwords;
 let snapshot = { logins: [], never: [], available: true };
@@ -33,8 +36,8 @@ function icon(login) {
 let toastTimer = null;
 function toast(text) {
   document.querySelector('.toast')?.remove();
-  const t = make('div', 'toast', text);
-  document.body.append(t);
+  const note = make('div', 'toast', text);
+  document.body.append(note);
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.remove(), 1800);
 }
@@ -44,34 +47,34 @@ function row(login) {
   const site = make('a', 'site');
   site.href = login.origin;
   site.append(make('span', 'host', hostOf(login.origin)));
-  const user = make('span', login.username ? 'user' : 'user none', login.username || 'sem nome de usuário');
+  const user = make('span', login.username ? 'user' : 'user none', login.username || t('sem nome de usuário'));
   const secret = make('span', 'secret', '••••••••');
   let shown = false;
-  const show = button('Mostrar', 'Mostrar a senha', async () => {
+  const show = button(t('Mostrar'), t('Mostrar a senha'), async () => {
     if (shown) {
       secret.textContent = '••••••••';
-      show.textContent = 'Mostrar';
+      show.textContent = t('Mostrar');
       shown = false;
       return;
     }
     const password = await api.reveal(login.id);
     if (password == null) return;
     secret.textContent = password;
-    show.textContent = 'Ocultar';
+    show.textContent = t('Ocultar');
     shown = true;
   });
   const actions = make('div', 'actions');
   actions.append(
     show,
-    button('Copiar', 'Copiar a senha', async () => {
-      if (await api.copy(login.id)) toast('Senha copiada');
+    button(t('Copiar'), t('Copiar a senha'), async () => {
+      if (await api.copy(login.id)) toast(t('Senha copiada'));
     }),
-    button('Editar', 'Editar', () => {
+    button(t('Editar'), t('Editar'), () => {
       editing = login.id;
       render();
     }),
-    button('Apagar', 'Apagar esta senha', async () => {
-      if (!confirm(`Apagar a senha de ${login.username || 'sem nome de usuário'} em ${hostOf(login.origin)}?`)) return;
+    button(t('Apagar'), t('Apagar esta senha'), async () => {
+      if (!confirm(t('Apagar a senha de {user} em {site}?', { user: login.username || t('sem nome de usuário'), site: hostOf(login.origin) }))) return;
       snapshot = await api.remove(login.id);
       render();
     }, 'remove'),
@@ -84,35 +87,35 @@ function editor(login) {
   const r = make('form', 'entry editing');
   const user = make('input');
   user.value = login.username;
-  user.placeholder = 'Nome de usuário';
+  user.placeholder = t('Nome de usuário');
   user.autocomplete = 'off';
   const pass = make('input');
   pass.type = 'password';
-  pass.placeholder = 'Nova senha (vazio mantém a atual)';
+  pass.placeholder = t('Nova senha (vazio mantém a atual)');
   pass.autocomplete = 'new-password';
   const error = make('div', 'error');
   error.hidden = true;
   r.append(icon(login), make('span', 'host', hostOf(login.origin)), user, pass,
-    button('Cancelar', 'Cancelar', (e) => {
+    button(t('Cancelar'), t('Cancelar'), (e) => {
       e.preventDefault();
       editing = null;
       render();
     }),
-    make('button', 'primary', 'Salvar'),
+    make('button', 'primary', t('Salvar')),
     error,
   );
   r.addEventListener('submit', async (e) => {
     e.preventDefault();
     const result = await api.update(login.id, { username: user.value.trim(), password: pass.value });
     if (result?.error === 'duplicate') {
-      error.textContent = 'Já existe uma senha salva com esse nome de usuário neste site.';
+      error.textContent = t('Já existe uma senha salva com esse nome de usuário neste site.');
       error.hidden = false;
       return;
     }
     snapshot = result;
     editing = null;
     render();
-    toast('Alterações salvas');
+    toast(t('Alterações salvas'));
   });
   setTimeout(() => user.focus());
   return r;
@@ -128,7 +131,7 @@ function render() {
   $('never').replaceChildren(
     ...snapshot.never.map((origin) => {
       const r = make('div', 'entry');
-      r.append(make('span', 'user', hostOf(origin)), button('Remover', 'Voltar a oferecer salvar neste site', async () => {
+      r.append(make('span', 'user', hostOf(origin)), button(t('Remover'), t('Voltar a oferecer salvar neste site'), async () => {
         snapshot = await api.removeNever(origin);
         render();
       }));
@@ -139,8 +142,8 @@ function render() {
 
 async function load() {
   snapshot = await api.list();
-  const where = { darwin: 'pelo Keychain do macOS', win32: 'pela proteção de dados do Windows' }[snapshot.platform] || 'pelo sistema';
-  $('note').textContent = `As senhas ficam só neste computador, criptografadas ${where}. Nada é enviado pela internet.`;
+  const where = { darwin: t('pelo Keychain do macOS'), win32: t('pela proteção de dados do Windows') }[snapshot.platform] || t('pelo sistema');
+  $('note').textContent = t('As senhas ficam só neste computador, criptografadas {where}. Nada é enviado pela internet.', { where });
   render();
 }
 

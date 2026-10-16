@@ -83,7 +83,7 @@ function renderExtPanel(highlight = null) {
   const list = extensionsState || [];
   if (!list.length) {
     const empty = el('div', 'ext-empty');
-    empty.append(el('p', null, 'Nenhuma extensão instalada.'), el('p', 'ext-hint', 'Extensões do Chrome, como o Bitwarden, se instalam pela Chrome Web Store.'));
+    empty.append(el('p', null, t('Nenhuma extensão instalada.')), el('p', 'ext-hint', t('Extensões do Chrome, como o Bitwarden, se instalam pela Chrome Web Store.')));
     extList.replaceChildren(empty);
     return;
   }
@@ -106,7 +106,7 @@ function renderExtPanel(highlight = null) {
       const pin = el('button', 'icon-btn small ext-pin');
       pin.innerHTML = PIN_ICON;
       pin.classList.toggle('on', ext.pinned);
-      pin.title = ext.pinned ? 'Desafixar da barra' : 'Fixar na barra';
+      pin.title = ext.pinned ? t('Desafixar da barra') : t('Fixar na barra');
       pin.setAttribute('aria-label', pin.title);
       pin.addEventListener('click', () => api.extPin({ id: ext.id, pinned: !ext.pinned }));
       row.append(main, pin);

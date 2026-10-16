@@ -12,6 +12,7 @@ const { clipboard, ipcMain, safeStorage, systemPreferences } = require('electron
 
 const { data, hostOf, originOf } = require('./data');
 const { registry } = require('./registry');
+const { t } = require('../i18n');
 
 const PENDING_TTL = 30_000; // a submitted login older than this is never offered
 const OFFER_TTL = 8_000; // after this, leaving the page drops the bar
@@ -158,6 +159,12 @@ function registerIpc({ fromPage, openPasswords }) {
       .sort((a, b) => b.used - a.used)
       .map(({ id, username }) => ({ id, username }));
   });
+
+  ipcMain.handle('pw:labels', () => ({
+    noUsername: t('(sem nome de usuário)'),
+    saved: t('senha salva no Kitty'),
+    manage: t('Gerenciar senhas…'),
+  }));
 
   ipcMain.handle('pw:fill', (event, id) => {
     const page = pageOf(event);

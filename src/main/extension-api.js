@@ -11,6 +11,7 @@ const path = require('node:path');
 const { BrowserWindow, Notification, ipcMain, nativeImage, screen, webFrameMain } = require('electron');
 
 const { registry } = require('./registry');
+const { t } = require('../i18n');
 const { NEW_TAB_URL } = require('./window');
 
 /** Set by extensions.js / main.js. */
@@ -684,7 +685,7 @@ function openPopup(kwin, ext, popupPath, anchor) {
   });
   wc.on('context-menu', (_e, params) => {
     const { Menu } = require('electron');
-    Menu.buildFromTemplate([{ label: 'Inspecionar pop-up', click: () => wc.inspectElement(params.x, params.y) }]).popup({ window: bw });
+    Menu.buildFromTemplate([{ label: t('Inspecionar pop-up'), click: () => wc.inspectElement(params.x, params.y) }]).popup({ window: bw });
   });
   bw.on('blur', () => {
     if (!bw.isDestroyed() && !wc.isDevToolsOpened()) bw.close();

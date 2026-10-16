@@ -10,6 +10,7 @@ const { Request, fromElectronDetails } = require('@ghostery/adblocker-electron')
 
 const { data, isShieldUp, hostOf, originOf } = require('./data');
 const { registry } = require('./registry');
+const { t } = require('../i18n');
 const lists = require('./lists');
 
 /** Hosts the user chose to open despite the dangerous-site warning (this run only). */
@@ -323,14 +324,14 @@ function saveDecision(kwin, origin, permissions, allow) {
 
 function promptLabel(permission, details, parts) {
   if (permission === 'media') {
-    if (parts.length === 2) return 'usar sua câmera e microfone';
-    return parts[0] === 'camera' ? 'usar sua câmera' : 'usar seu microfone';
+    if (parts.length === 2) return t('usar sua câmera e microfone');
+    return parts[0] === 'camera' ? t('usar sua câmera') : t('usar seu microfone');
   }
   if (permission === 'openExternal' && details?.externalURL) {
     const scheme = details.externalURL.split(':')[0];
-    return `abrir links “${scheme}:” em outro aplicativo`;
+    return t('abrir links “{scheme}:” em outro aplicativo', { scheme });
   }
-  return PROMPTED[permission];
+  return PROMPTED[permission] && t(PROMPTED[permission]);
 }
 
 function onPermissionRequest(webContents, permission, callback, details) {

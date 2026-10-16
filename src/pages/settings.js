@@ -1,27 +1,30 @@
 'use strict';
 
+const t = window.kitty.t; // the interface language (src/i18n)
+window.kitty.translate(); // the static text, before this script reads or changes it
+
 const $ = (id) => document.getElementById(id);
 const settings = window.kitty.settings;
 
 const PERMISSION_NAMES = {
-  camera: 'Câmera',
-  microphone: 'Microfone',
-  geolocation: 'Localização',
-  notifications: 'Notificações',
-  midi: 'Dispositivos MIDI',
-  midiSysex: 'Controle MIDI',
-  'clipboard-read': 'Área de transferência',
-  'idle-detection': 'Detecção de ausência',
-  'window-management': 'Gerenciar janelas',
-  'storage-access': 'Cookies em outros sites',
-  'top-level-storage-access': 'Cookies em outros sites',
-  hid: 'Dispositivos HID',
-  serial: 'Portas seriais',
-  usb: 'Dispositivos USB',
-  speaker: 'Saída de áudio',
-  'speaker-selection': 'Saída de áudio',
-  keyboardLock: 'Captura do teclado',
-  openExternal: 'Abrir aplicativos externos',
+  camera: t('Câmera'),
+  microphone: t('Microfone'),
+  geolocation: t('Localização'),
+  notifications: t('Notificações'),
+  midi: t('Dispositivos MIDI'),
+  midiSysex: t('Controle MIDI'),
+  'clipboard-read': t('Área de transferência'),
+  'idle-detection': t('Detecção de ausência'),
+  'window-management': t('Gerenciar janelas'),
+  'storage-access': t('Cookies em outros sites'),
+  'top-level-storage-access': t('Cookies em outros sites'),
+  hid: t('Dispositivos HID'),
+  serial: t('Portas seriais'),
+  usb: t('Dispositivos USB'),
+  speaker: t('Saída de áudio'),
+  'speaker-selection': t('Saída de áudio'),
+  keyboardLock: t('Captura do teclado'),
+  openExternal: t('Abrir aplicativos externos'),
 };
 
 if (window.kitty.platform !== 'darwin') {
@@ -37,7 +40,7 @@ function item(label, detail, onRemove) {
   text.append(label);
   if (detail) text.append(' ', detail);
   const remove = document.createElement('button');
-  remove.textContent = 'Remover';
+  remove.textContent = t('Remover');
   remove.addEventListener('click', onRemove);
   row.append(text, remove);
   return row;
@@ -69,7 +72,7 @@ function render(s) {
 
   const dns = $('dns');
   dns.replaceChildren(
-    ...[{ id: 'off', name: 'Desligado (DNS do sistema)' }, ...s.dnsProviders].map((p) => {
+    ...[{ id: 'off', name: t('Desligado (DNS do sistema)') }, ...s.dnsProviders].map((p) => {
       const option = document.createElement('option');
       option.value = p.id;
       option.textContent = p.name;
@@ -79,32 +82,35 @@ function render(s) {
   dns.value = s.values.secureDns;
   $('tab-layout').value = s.values.tabLayout;
   $('theme').value = s.values.theme;
+  const language = $('language');
+  if (!language.options.length) language.append(...s.languages.map((l) => new Option(l.name, l.id)));
+  language.value = s.values.language;
   $('bookmarks-bar').value = s.values.bookmarksBar;
 
-  const ago = (t) => {
-    if (!t) return 'nunca';
-    const min = Math.round((Date.now() - t) / 60000);
-    if (min < 1) return 'agora mesmo';
-    if (min < 60) return `há ${min} min`;
+  const ago = (time) => {
+    if (!time) return t('nunca');
+    const min = Math.round((Date.now() - time) / 60000);
+    if (min < 1) return t('agora mesmo');
+    if (min < 60) return t('há {n} min', { n: min });
     const h = Math.round(min / 60);
-    return h < 48 ? `há ${h} h` : `há ${Math.round(h / 24)} dias`;
+    return h < 48 ? t('há {n} h', { n: h }) : t('há {n} dias', { n: Math.round(h / 24) });
   };
   $('lists-status').textContent = s.lists.refreshing
-    ? 'Atualizando…'
-    : `Anúncios e rastreadores: ${ago(s.lists.ads)} · Sites perigosos: ${ago(s.lists.threats)}.`;
+    ? t('Atualizando…')
+    : t('Anúncios e rastreadores: {ads} · Sites perigosos: {threats}.', { ads: ago(s.lists.ads), threats: ago(s.lists.threats) });
 
   $('default-status').textContent = !s.canBeDefault
-    ? 'Disponível no app instalado (não no modo de desenvolvimento)'
+    ? t('Disponível no app instalado (não no modo de desenvolvimento)')
     : s.isDefaultBrowser
-      ? 'O Kitty é o seu navegador padrão 🎉'
-      : 'Links de outros apps abrem em outro navegador';
+      ? t('O Kitty é o seu navegador padrão 🎉')
+      : t('Links de outros apps abrem em outro navegador');
   $('make-default').hidden = s.isDefaultBrowser || !s.canBeDefault;
-  $('make-default').textContent = s.platform === 'win32' ? 'Escolher nas Configurações do Windows' : 'Tornar padrão';
+  $('make-default').textContent = s.platform === 'win32' ? t('Escolher nas Configurações do Windows') : t('Tornar padrão');
 
   $('allowlist').replaceChildren(
     ...(s.allowlist.length
       ? s.allowlist.map((host) => item(host, null, async () => render(await settings.removeAllowlisted(host))))
-      : [none('Nenhum — os escudos estão ativos em todos os sites.')]),
+      : [none(t('Nenhum — os escudos estão ativos em todos os sites.'))]),
   );
 
   $('permissions').replaceChildren(
@@ -119,7 +125,7 @@ function render(s) {
             render(await settings.removePermission(p.origin, p.permission)),
           );
         })
-      : [none('Nenhum site pediu permissões ainda. Quando pedir, o Kitty pergunta antes de liberar.')]),
+      : [none(t('Nenhum site pediu permissões ainda. Quando pedir, o Kitty pergunta antes de liberar.'))]),
   );
 
   $('downloads-dir').textContent = s.downloadsDir;
@@ -129,18 +135,16 @@ function render(s) {
   $('check-update').hidden = !u.supported || u.status === 'ready' || u.status === 'downloading';
   $('auto-update-row').hidden = !u.supported;
   $('update-status').textContent = !u.supported
-    ? s.platform === 'darwin'
-      ? 'No Mac, a atualização automática exige uma assinatura paga da Apple. Por enquanto, instale as versões novas manualmente.'
-      : 'Atualização automática disponível no app instalado.'
+    ? t('Atualização automática disponível no app instalado.')
     : {
         idle: s.values.autoUpdate
-          ? 'O Kitty procura atualizações sozinho, a cada poucas horas, em github.com/caiogobbi/kitty-browser.'
-          : 'A busca automática está desligada. Use o botão para procurar agora.',
-        checking: 'Procurando atualizações…',
-        downloading: `Baixando a versão ${u.available}… ${u.progress}%`,
-        ready: `A versão ${u.available} está pronta. Use o botão “Atualizar” na barra de ferramentas para reiniciar.`,
-        latest: 'Você está usando a versão mais recente.',
-        error: `Não foi possível procurar atualizações (${u.error}).`,
+          ? t('O Kitty procura atualizações sozinho, a cada poucas horas, em github.com/caiogobbi/kitty-browser.')
+          : t('A busca automática está desligada. Use o botão para procurar agora.'),
+        checking: t('Procurando atualizações…'),
+        downloading: t('Baixando a versão {version}… {progress}%', { version: u.available, progress: u.progress }),
+        ready: t('A versão {version} está pronta. Use o botão “Atualizar” na barra de ferramentas para reiniciar.', { version: u.available }),
+        latest: t('Você está usando a versão mais recente.'),
+        error: t('Não foi possível procurar atualizações ({error}).', { error: u.error }),
       }[u.status];
   $('version').textContent = s.version;
 }
@@ -157,10 +161,12 @@ $('make-default').addEventListener('click', async () => {
 $('dns').addEventListener('change', async (e) => render(await settings.set('secureDns', e.target.value)));
 $('bookmarks-bar').addEventListener('change', async (e) => render(await settings.set('bookmarksBar', e.target.value)));
 $('theme').addEventListener('change', async (e) => render(await settings.set('theme', e.target.value)));
+// Kitty reloads its pages in the new language.
+$('language').addEventListener('change', (e) => settings.set('language', e.target.value));
 $('tab-layout').addEventListener('change', async (e) => render(await settings.set('tabLayout', e.target.value)));
 $('update-lists').addEventListener('click', async (e) => {
   e.target.disabled = true;
-  $('lists-status').textContent = 'Atualizando…';
+  $('lists-status').textContent = t('Atualizando…');
   render(await settings.updateLists());
   e.target.disabled = false;
 });
@@ -176,7 +182,7 @@ $('check-update').addEventListener('click', async () => {
 $('open-downloads').addEventListener('click', () => settings.openDownloads());
 $('clear').addEventListener('click', async () => {
   const kinds = [...document.querySelectorAll('#clear-kinds input:checked')].map((i) => i.value);
-  if (!kinds.length || !confirm('Apagar os dados selecionados? Isso não pode ser desfeito.')) return;
+  if (!kinds.length || !confirm(t('Apagar os dados selecionados? Isso não pode ser desfeito.'))) return;
   render(await settings.clearData(kinds));
   $('cleared').hidden = false;
   setTimeout(() => ($('cleared').hidden = true), 3000);
@@ -186,7 +192,7 @@ $('clear').addEventListener('click', async () => {
 // Browsers that macOS keeps Kitty out of still show up in the list, marked, so
 // picking one leads to the permission instead of an empty list.
 const BLOCKED = 'blocked:';
-const PRIVACY_PATH = 'Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco';
+const PRIVACY_PATH = t('Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco');
 
 async function loadImportSources() {
   const { sources, blocked } = await settings.importSources();
@@ -206,8 +212,8 @@ async function loadImportSources() {
   select.disabled = sources.length + blocked.length === 0;
   $('import-hint').textContent =
     sources.length || blocked.length
-      ? 'Traz favoritos e histórico salvos no computador. Nada é enviado pela internet.'
-      : 'Nenhum outro navegador encontrado neste computador.';
+      ? t('Traz favoritos e histórico salvos no computador. Nada é enviado pela internet.')
+      : t('Nenhum outro navegador encontrado neste computador.');
   updateImportChoice();
 }
 
@@ -217,11 +223,9 @@ function updateImportChoice() {
   $('import-blocked').hidden = !blockedName;
   if (blockedName) {
     $('import-blocked-text').textContent =
-      `O macOS não deixa o Kitty ler os dados do ${blockedName}. Para liberar, ative o Kitty em ` +
-      `${PRIVACY_PATH} e volte para esta tela. Se o Kitty já estiver na lista, apague-o com o botão − e ` +
-      'adicione de novo com o +: o macOS esquece a permissão quando o Kitty é atualizado.';
+      t('O macOS não deixa o Kitty ler os dados do {browser}. Para liberar, ative o Kitty em {path} e volte para esta tela. Se o Kitty já estiver na lista, apague-o com o botão − e adicione de novo com o +: o macOS esquece a permissão quando o Kitty é atualizado.', { browser: blockedName, path: PRIVACY_PATH });
   }
-  $('import').textContent = blockedName ? 'Dar permissão' : 'Importar';
+  $('import').textContent = blockedName ? t('Dar permissão') : t('Importar');
   $('import').disabled = !value;
 }
 
@@ -238,21 +242,21 @@ $('import').addEventListener('click', async (e) => {
   if (!kinds.length) return;
   const status = $('import-status');
   e.target.disabled = true;
-  status.textContent = 'Importando…';
+  status.textContent = t('Importando…');
   const r = await settings.importRun($('import-source').value, kinds);
   e.target.disabled = false;
   if (!r || r.error) {
-    status.textContent = r?.error || 'Não foi possível importar.';
+    status.textContent = r?.error || t('Não foi possível importar.');
     return;
   }
   if (!r.bookmarks && !r.history) {
-    status.textContent = 'Nada novo para importar: o Kitty já tem tudo isso.';
+    status.textContent = t('Nada novo para importar: o Kitty já tem tudo isso.');
     return;
   }
   const parts = [];
-  if (kinds.includes('bookmarks')) parts.push(`${r.bookmarks} ${r.bookmarks === 1 ? 'favorito' : 'favoritos'}`);
-  if (kinds.includes('history')) parts.push(`${r.history} ${r.history === 1 ? 'página' : 'páginas'} do histórico`);
-  status.textContent = `Pronto: ${parts.join(' e ')} ${r.bookmarks + r.history === 1 ? 'importado' : 'importados'}.`;
+  if (kinds.includes('bookmarks')) parts.push(r.bookmarks === 1 ? t('1 favorito') : t('{n} favoritos', { n: r.bookmarks }));
+  if (kinds.includes('history')) parts.push(r.history === 1 ? t('1 página do histórico') : t('{n} páginas do histórico', { n: r.history }));
+  status.textContent = t('Importado: {what}.', { what: parts.join(` ${t('e')} `) });
 });
 
 settings.get().then(render);

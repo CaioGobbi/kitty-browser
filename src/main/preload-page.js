@@ -6,8 +6,43 @@ const { contextBridge, ipcRenderer } = require('electron');
 // the sender's page on every call, so one page can't use another page's API.
 if (location.protocol === 'kitty:') {
   const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
+
+  // Interface language (src/i18n): the same t() as the main process, and the
+  // static HTML translated as it loads.
+  const i18n = ipcRenderer.sendSync('i18n:get');
+  const t = (text, vars) => {
+    const out = Object.hasOwn(i18n.dict, text) ? i18n.dict[text] : text;
+    return vars ? out.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : out;
+  };
+  let translatedDocument = false; // the page's script may do it first, before changing the text
+  function translate(root) {
+    if (root === document) translatedDocument = true;
+    const lookup = (s) => {
+      const key = s.trim().replace(/\s+/g, ' ');
+      return key && Object.hasOwn(i18n.dict, key) ? i18n.dict[key] : null;
+    };
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const out = lookup(node.nodeValue);
+      if (out !== null) node.nodeValue = node.nodeValue.replace(/\S[\s\S]*\S|\S/, () => out);
+    }
+    for (const attr of ['title', 'placeholder', 'aria-label', 'alt']) {
+      for (const el of root.querySelectorAll(`[${attr}]`)) {
+        const out = lookup(el.getAttribute(attr));
+        if (out !== null) el.setAttribute(attr, out);
+      }
+    }
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.documentElement.lang = i18n.lang;
+    if (!translatedDocument) translate(document);
+  });
+
   contextBridge.exposeInMainWorld('kitty', {
     platform: process.platform,
+    lang: i18n.lang,
+    t,
+    translate: () => translate(document), // DOM nodes can't cross the bridge
     context: invoke('kitty:context'),
     stats: invoke('kitty:stats'),
     history: invoke('kitty:history'),
@@ -223,6 +258,7 @@ if (/^https?:$/.test(location.protocol) && window === window.top) {
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   const seen = new WeakSet();
   let accounts = null; // saved accounts for this origin, asked once per page
+  let labels = null; // the picker's texts, in Kitty's language
   let picker = null;
   const PICKER_CSS = `
     :host { all: initial; position: fixed; z-index: 2147483647; }
@@ -317,7 +353,7 @@ if (/^https?:$/.test(location.protocol) && window === window.top) {
 
   function openPicker(input) {
     closePicker();
-    if (!accounts?.length) return;
+    if (!accounts?.length || !labels) return;
     const password = input.type === 'password' ? input : passwordFields(input.form || document)[0];
     if (!password) return;
     const host = document.createElement('kitty-passwords');
@@ -333,10 +369,10 @@ if (/^https?:$/.test(location.protocol) && window === window.top) {
       const b = document.createElement('button');
       const user = document.createElement('div');
       user.className = 'user';
-      user.textContent = account.username || '(sem nome de usuário)';
+      user.textContent = account.username || labels.noUsername;
       const dots = document.createElement('div');
       dots.className = 'dots';
-      dots.textContent = '•••••••• · senha salva no Kitty';
+      dots.textContent = `•••••••• · ${labels.saved}`;
       b.append(user, dots);
       b.addEventListener('mousedown', (e) => e.preventDefault()); // keep the field focused
       b.addEventListener('click', (e) => {
@@ -348,7 +384,7 @@ if (/^https?:$/.test(location.protocol) && window === window.top) {
     }
     const manage = document.createElement('button');
     manage.className = 'manage';
-    manage.textContent = 'Gerenciar senhas…';
+    manage.textContent = labels.manage;
     manage.addEventListener('mousedown', (e) => e.preventDefault());
     manage.addEventListener('click', (e) => {
       if (!e.isTrusted) return;
@@ -367,6 +403,7 @@ if (/^https?:$/.test(location.protocol) && window === window.top) {
     const fresh = fields.filter((f) => !seen.has(f));
     if (!fresh.length) return;
     accounts ??= await ipcRenderer.invoke('pw:query').catch(() => []);
+    if (accounts.length) labels ??= await ipcRenderer.invoke('pw:labels').catch(() => null);
     for (const password of fresh) {
       seen.add(password);
       const user = usernameFor(password);

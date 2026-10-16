@@ -1,5 +1,8 @@
 'use strict';
 
+const t = window.kitty.t; // the interface language (src/i18n)
+window.kitty.translate(); // the static text, before this script reads or changes it
+
 // No search box here: typing goes to the address bar, which gets the focus
 // when a new tab opens (switchTab in window.js).
 
@@ -7,7 +10,7 @@ window.kitty.context().then((ctx) => {
   if (!ctx) return;
   document.body.classList.toggle('private', ctx.isPrivate);
   document.getElementById('private-note').hidden = !ctx.isPrivate;
-  if (ctx.isPrivate) document.title = 'Janela privativa';
+  if (ctx.isPrivate) document.title = t('Janela privativa');
 });
 
 window.kitty.stats().then((stats) => {

@@ -1,5 +1,8 @@
 'use strict';
 
+const t = window.kitty.t; // the interface language (src/i18n)
+window.kitty.translate(); // the static text, before this script reads or changes it
+
 // Bookmarks and folders come in one list, in order (see main/bookmarks.js):
 // `folder` is the path of folder names an item lives in, folders have
 // `type: 'folder'`, and imported ones that weren't on the other browser's bar
@@ -9,8 +12,8 @@ const list = document.getElementById('list');
 const empty = document.getElementById('empty');
 const filter = document.getElementById('filter');
 
-const BAR_NAME = 'Barra de favoritos';
-const OTHER_NAME = 'Outros favoritos';
+const BAR_NAME = t('Barra de favoritos');
+const OTHER_NAME = t('Outros favoritos');
 
 let items = [];
 let draggedId = null;
@@ -102,8 +105,8 @@ function editInPlace(node, save) {
 /** "Mover para…": every folder, plus the bar and "Outros favoritos" themselves. */
 function moveSelect(b) {
   const select = document.createElement('select');
-  select.title = 'Mover para outra pasta';
-  const placeholder = new Option('Mover para…', '');
+  select.title = t('Mover para outra pasta');
+  const placeholder = new Option(t('Mover para…'), '');
   placeholder.disabled = true;
   select.append(placeholder);
   for (const g of groups()) {
@@ -140,12 +143,12 @@ function entry(b, group) {
   const actions = document.createElement('div');
   actions.className = 'actions';
   actions.append(
-    button('✎', 'Renomear', () => {
+    button('✎', t('Renomear'), () => {
       link.addEventListener('click', (e) => e.preventDefault(), { once: true });
       editInPlace(title, (text) => run({ op: 'update', id: b.id, title: text, url: b.url }));
     }),
     moveSelect(b),
-    button('✕', 'Excluir', () => run({ op: 'remove', id: b.id })),
+    button('✕', t('Excluir'), () => run({ op: 'remove', id: b.id })),
   );
 
   row.append(icon(b), link, actions);
@@ -170,13 +173,13 @@ function heading(group) {
     const actions = document.createElement('span');
     actions.className = 'actions';
     actions.append(
-      button('Renomear', 'Renomear a pasta', () => {
+      button(t('Renomear'), t('Renomear a pasta'), () => {
         name.textContent = f.title;
         editInPlace(name, (text) => run({ op: 'update', id: f.id, title: text }));
       }),
-      button('Excluir', 'Excluir a pasta e o que tem dentro', () => {
+      button(t('Excluir'), t('Excluir a pasta e o que tem dentro'), () => {
         const count = items.filter((b) => b !== f && onBar(b) === onBar(f) && [...pathOf(f), f.title].every((n, i) => pathOf(b)[i] === n)).length;
-        if (count && !confirm(`Excluir a pasta "${f.title}" e os ${count} itens dentro dela?`)) return;
+        if (count && !confirm(t('Excluir a pasta "{name}" e os {n} itens dentro dela?', { name: f.title, n: count }))) return;
         run({ op: 'remove', id: f.id });
       }),
     );
@@ -245,7 +248,7 @@ async function render() {
 }
 
 document.getElementById('new-folder').addEventListener('click', async () => {
-  const { id } = await run({ op: 'addFolder', title: 'Nova pasta' });
+  const { id } = await run({ op: 'addFolder', title: t('Nova pasta') });
   const h = id && list.querySelector(`h2[data-id="${CSS.escape(id)}"] .name`);
   if (!h) return;
   h.scrollIntoView({ block: 'center' });
