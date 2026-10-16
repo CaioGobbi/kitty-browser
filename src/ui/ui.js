@@ -65,6 +65,8 @@ const ICONS = {
   pause: '<svg viewBox="0 0 16 16"><path d="M6 4v8M10 4v8"/></svg>',
   play: '<svg viewBox="0 0 16 16"><path d="M5.5 3.5v9l7-4.5z"/></svg>',
   folder: '<svg viewBox="0 0 16 16"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z"/></svg>',
+  back: '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>',
+  forward: '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>',
 };
 
 const activeTab = () => state.tabs.find((t) => t.id === state.activeTabId);
@@ -527,51 +529,244 @@ function moveSuggestion(delta) {
 
 // ---------------------------------------------------------------------------
 // Bookmarks bar
+//
+// Bookmarks and folders come in one list, in order (see main/bookmarks.js):
+// `folder` is the path of folder names an item lives in, folders have
+// `type: 'folder'`. Imported ones that weren't on the other browser's bar
+// (`bar: false`) only show in kitty://bookmarks.
+
+const folderPanel = $('folder-panel');
+const bookmarkDialog = $('bookmark-dialog');
+
+const isFolderItem = (b) => b.type === 'folder';
+const pathOf = (b) => (Array.isArray(b.folder) ? b.folder : []);
+const findBookmark = (id) => bookmarks.find((b) => b.id === id);
+
+/** What's directly inside a folder item, or on the bar itself for null. */
+function childrenOf(folder) {
+  const path = folder ? [...pathOf(folder), folder.title] : [];
+  const bar = folder ? folder.bar !== false : true;
+  return bookmarks.filter((b) => {
+    const p = pathOf(b);
+    return (b.bar !== false) === bar && p.length === path.length && path.every((name, i) => p[i] === name);
+  });
+}
 
 function bookmarkButton(b) {
   const button = el('button', 'bookmark');
+  button.dataset.id = b.id;
+  button.draggable = true;
   button.title = `${b.title}\n${b.url}`;
   button.append(faviconOrLetter(b.url, b.favicon), el('span', '', b.title || b.url));
   button.addEventListener('click', (e) => api.openBookmark({ id: b.id, newTab: e.metaKey || e.ctrlKey }));
   button.addEventListener('auxclick', (e) => e.button === 1 && api.openBookmark({ id: b.id, newTab: true }));
-  button.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    api.bookmarkMenu(b.id);
-  });
   return button;
 }
 
-/** A folder of imported bookmarks: opens a native menu with its contents right below it. */
-function folderButton(name) {
+/** A folder on the bar: opens its contents in a panel right below it. */
+function folderButton(f) {
   const button = el('button', 'bookmark folder');
-  button.title = name;
+  button.dataset.id = f.id;
+  button.draggable = true;
+  button.title = f.title;
   const icon = el('span', 'icon');
   icon.innerHTML = ICONS.folder;
-  button.append(icon, el('span', '', name));
-  button.addEventListener('click', () => {
-    const rect = button.getBoundingClientRect();
-    api.bookmarkFolder({ name, x: rect.left, y: rect.bottom });
-  });
+  button.append(icon, el('span', '', f.title));
+  button.addEventListener('click', () => openFolder(f, button));
   return button;
 }
 
 function renderBookmarks() {
-  // Imported bookmarks that weren't on the other browser's bar only show in kitty://bookmarks.
-  const onBar = bookmarks.filter((b) => b.bar !== false);
-  bookmarksBar.hidden = !uiSettings.showBookmarksBar || onBar.length === 0;
-  // Loose bookmarks as buttons; each top-level folder once, where its first bookmark is.
-  const folders = new Set();
-  const buttons = [];
-  for (const b of onBar) {
-    const name = b.folder?.[0];
-    if (name == null) buttons.push(bookmarkButton(b));
-    else if (!folders.has(name)) {
-      folders.add(name);
-      buttons.push(folderButton(name));
-    }
-  }
-  bookmarksBar.replaceChildren(...buttons);
+  const top = childrenOf(null);
+  bookmarksBar.hidden = !uiSettings.showBookmarksBar || top.length === 0;
+  bookmarksBar.replaceChildren(...top.map((b) => (isFolderItem(b) ? folderButton(b) : bookmarkButton(b))));
+  if (openPopup === folderPanel) renderFolderPanel();
 }
+
+// Right click: on a bookmark or folder, or on empty space (to add one).
+bookmarksBar.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  api.bookmarkMenu({ id: e.target.closest('[data-id]')?.dataset.id ?? null });
+});
+
+// ---- Folder panel: the folder's contents; subfolders open in the same panel.
+
+let folderTrail = []; // ids of the folders opened, the shown one last
+
+function openFolder(f, anchor) {
+  folderTrail = [f.id];
+  renderFolderPanel();
+  const r = anchor.getBoundingClientRect();
+  showPopup(folderPanel, { left: `${Math.max(8, Math.min(r.left, window.innerWidth - 300))}px`, top: `${r.bottom + 4}px` });
+}
+
+function renderFolderPanel() {
+  const folder = findBookmark(folderTrail.at(-1));
+  if (!folder) return closePopup();
+  const rows = [];
+  if (folderTrail.length > 1) {
+    const back = el('button', 'folder-row back');
+    back.innerHTML = ICONS.back;
+    back.append(el('span', 'name', findBookmark(folderTrail.at(-2))?.title ?? ''));
+    back.addEventListener('click', () => {
+      folderTrail.pop();
+      renderFolderPanel();
+    });
+    rows.push(back);
+  }
+  const kids = childrenOf(folder);
+  for (const b of kids) {
+    const row = el('button', 'folder-row');
+    row.dataset.id = b.id;
+    row.draggable = true;
+    if (isFolderItem(b)) {
+      const icon = el('span', 'icon');
+      icon.innerHTML = ICONS.folder;
+      row.append(icon, el('span', 'name', b.title));
+      const more = el('span', 'more');
+      more.innerHTML = ICONS.forward;
+      row.append(more);
+      row.addEventListener('click', () => {
+        folderTrail.push(b.id);
+        renderFolderPanel();
+      });
+    } else {
+      row.title = b.url;
+      row.append(faviconOrLetter(b.url, b.favicon), el('span', 'name', b.title || b.url));
+      row.addEventListener('click', (e) => {
+        closePopup();
+        api.openBookmark({ id: b.id, newTab: e.metaKey || e.ctrlKey });
+      });
+      row.addEventListener('auxclick', (e) => e.button === 1 && api.openBookmark({ id: b.id, newTab: true }));
+    }
+    rows.push(row);
+  }
+  if (!kids.length) rows.push(el('div', 'folder-empty', 'Pasta vazia'));
+  folderPanel.replaceChildren(...rows);
+}
+
+folderPanel.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const id = e.target.closest('[data-id]')?.dataset.id ?? null;
+  api.bookmarkMenu({ id, parentId: folderTrail.at(-1) });
+});
+
+// ---- Drag and drop: reorder on the bar and in folders, drop on a folder to put it inside.
+
+let draggedId = null;
+
+function clearDropMarks() {
+  for (const node of document.querySelectorAll('.drop-before, .drop-after, .drop-into')) {
+    node.classList.remove('drop-before', 'drop-after', 'drop-into');
+  }
+}
+
+/** Where a drop at the pointer would put the dragged item, inside `container`. */
+function dropSpot(e, container, parentId) {
+  const target = e.target.closest('[data-id]');
+  if (!target || !container.contains(target)) return { parentId, beforeId: null, node: null };
+  const vertical = container === folderPanel;
+  const r = target.getBoundingClientRect();
+  const pos = vertical ? (e.clientY - r.top) / r.height : (e.clientX - r.left) / r.width;
+  const item = findBookmark(target.dataset.id);
+  if (item && isFolderItem(item) && item.id !== draggedId && pos > 0.25 && pos < 0.75) {
+    return { parentId: item.id, beforeId: null, node: target, mark: 'drop-into' };
+  }
+  if (pos < 0.5) return { parentId, beforeId: target.dataset.id, node: target, mark: 'drop-before' };
+  let next = target.nextElementSibling;
+  while (next && !next.dataset.id) next = next.nextElementSibling;
+  return { parentId, beforeId: next?.dataset.id ?? null, node: target, mark: 'drop-after' };
+}
+
+function acceptDrops(container, parentIdOf) {
+  container.addEventListener('dragover', (e) => {
+    if (!draggedId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const spot = dropSpot(e, container, parentIdOf());
+    clearDropMarks();
+    if (spot.node && spot.node.dataset.id !== draggedId) spot.node.classList.add(spot.mark);
+  });
+  container.addEventListener('dragleave', (e) => {
+    if (!container.contains(e.relatedTarget)) clearDropMarks();
+  });
+  container.addEventListener('drop', async (e) => {
+    if (!draggedId) return;
+    e.preventDefault();
+    const id = draggedId;
+    const spot = dropSpot(e, container, parentIdOf());
+    clearDropMarks();
+    if (spot.node?.dataset.id === id) return;
+    await api.bookmarkOp({ op: 'move', id, parentId: spot.parentId, beforeId: spot.beforeId });
+    // Dropped from a folder onto the bar: the folder's panel is in the way now.
+    if (container === bookmarksBar && openPopup === folderPanel) closePopup();
+  });
+}
+
+for (const container of [bookmarksBar, folderPanel]) {
+  container.addEventListener('dragstart', (e) => {
+    const node = e.target.closest('[data-id]');
+    if (!node) return;
+    draggedId = node.dataset.id;
+    const b = findBookmark(draggedId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', b?.url || b?.title || '');
+    // Lets a bookmark leave its folder's panel for the bar.
+    document.body.classList.add('dragging-bookmark');
+  });
+  container.addEventListener('dragend', () => {
+    draggedId = null;
+    clearDropMarks();
+    document.body.classList.remove('dragging-bookmark');
+  });
+}
+acceptDrops(bookmarksBar, () => null);
+acceptDrops(folderPanel, () => folderTrail.at(-1));
+
+// ---- Dialog to add or edit a bookmark or folder (opened from the right-click menu).
+
+const DIALOG_TITLES = { edit: 'Editar favorito', add: 'Adicionar página', folder: 'Nova pasta', rename: 'Renomear pasta' };
+let dialogState = null;
+
+api.onBookmarkDialog((d) => {
+  dialogState = d;
+  const withUrl = d.mode === 'edit' || d.mode === 'add';
+  $('bd-heading').textContent = DIALOG_TITLES[d.mode] ?? 'Favorito';
+  $('bd-name').value = d.title || (d.mode === 'folder' ? 'Nova pasta' : '');
+  $('bd-url').value = d.url || '';
+  $('bd-url-row').hidden = !withUrl;
+  $('bd-error').hidden = true;
+  const top = chrome.getBoundingClientRect().bottom;
+  showPopup(bookmarkDialog, { left: `${Math.max(8, (window.innerWidth - 380) / 2)}px`, top: `${top + 8}px` });
+  $('bd-name').focus();
+  $('bd-name').select();
+});
+
+bookmarkDialog.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const d = dialogState;
+  if (!d) return;
+  const title = $('bd-name').value;
+  const url = $('bd-url').value;
+  const op = {
+    edit: { op: 'update', id: d.id, title, url },
+    rename: { op: 'update', id: d.id, title },
+    add: { op: 'add', title, url, parentId: d.parentId ?? null },
+    folder: { op: 'addFolder', title, parentId: d.parentId ?? null },
+  }[d.mode];
+  const result = op && (await api.bookmarkOp(op));
+  if (result?.error) {
+    $('bd-error').textContent = result.error;
+    $('bd-error').hidden = false;
+    return;
+  }
+  closePopup();
+});
+$('bd-cancel').addEventListener('click', () => closePopup());
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && (openPopup === bookmarkDialog || openPopup === folderPanel)) closePopup();
+});
 
 // ---------------------------------------------------------------------------
 // Permission prompts

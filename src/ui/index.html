@@ -122,6 +122,18 @@
       <button data-action="settings">Configurações<kbd>⌘,</kbd></button>
     </div>
 
+    <div id="folder-panel" class="popup" hidden></div>
+    <form id="bookmark-dialog" class="popup" autocomplete="off" hidden>
+      <strong id="bd-heading"></strong>
+      <label>Nome<input id="bd-name" type="text" spellcheck="false" maxlength="300" /></label>
+      <label id="bd-url-row">Endereço<input id="bd-url" type="text" spellcheck="false" /></label>
+      <p id="bd-error" hidden></p>
+      <div class="bd-buttons">
+        <button id="bd-cancel" type="button" class="btn">Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+
     <script src="ui.js"></script>
   </body>
 </html>

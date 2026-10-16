@@ -14,6 +14,7 @@ const lists = require('./lists');
 const updater = require('./updater');
 const gestures = require('./gestures');
 const importer = require('./importer');
+const bookmarkEdits = require('./bookmarks');
 const passwords = require('./passwords');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
@@ -30,6 +31,7 @@ if (!isPrimaryInstance) app.quit();
 
 // Settings are read before startup: some only apply as Chromium switches.
 initData(app.getPath('userData'));
+bookmarkEdits.ensureFolders(); // folders of older imports become items
 if (data.settings.get('blockThirdPartyCookies')) {
   // Chromium's own third-party cookie blocking (the one Chrome is testing).
   // Unlike header filtering, it also stops cookies that scripts inside
@@ -194,6 +196,7 @@ function saveSessionNow() {
 // Bookmarks
 
 function broadcastBookmarks() {
+  bookmarkEdits.ensureFolders(); // imports only record folder paths
   registry.broadcast('bookmarks:state', data.bookmarks.get('items'));
   for (const w of registry.windows) w.sendState();
 }
@@ -232,9 +235,21 @@ async function inlineBookmarkFavicons() {
   }
 }
 
-function removeBookmark(id) {
-  data.bookmarks.set('items', data.bookmarks.get('items').filter((b) => b.id !== id));
+function editBookmarks(op) {
+  const result = bookmarkEdits.run(op);
   broadcastBookmarks();
+  return result;
+}
+
+/** "Adicionar página…" and friends: the edit dialog lives in the window's UI. */
+function bookmarkDialog(kwin, dialog) {
+  if (dialog.mode === 'add') {
+    const tab = kwin.activeTab();
+    const { url, title } = tab ? kwin.tabState(tab) : {};
+    if (/^https?:/.test(url || '')) Object.assign(dialog, { url, title });
+  }
+  kwin.ui.webContents.focus();
+  kwin.sendUi('bookmark:dialog', dialog);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +265,7 @@ function localSuggestions(query) {
   const byUrl = new Map();
   const now = Date.now();
   for (const b of data.bookmarks.get('items')) {
-    if (matches(b.title, b.url)) byUrl.set(b.url, { url: b.url, title: b.title, score: 40, bookmark: true });
+    if (b.url && matches(b.title, b.url)) byUrl.set(b.url, { url: b.url, title: b.title, score: 40, bookmark: true });
   }
   for (const e of data.history.get('entries')) {
     if (!matches(e.title, e.url)) continue;
@@ -402,12 +417,12 @@ function registerIpc() {
   ui('bookmark:toggle', (w) => toggleBookmark(w));
   ui('bookmark:open', (w, { id, newTab } = {}) => {
     const b = data.bookmarks.get('items').find((x) => x.id === id);
-    if (!b) return;
+    if (!b?.url) return;
     if (newTab) w.createTab(b.url, { activate: false });
     else w.navigate(b.url);
   });
-  ui('bookmark:menu', (w, id) => menus.bookmarkContextMenu(w, id));
-  ui('bookmark:folder', (w, { name, x, y } = {}) => menus.bookmarkFolderMenu(w, String(name), x, y));
+  ui('bookmark:menu', (w, { id, parentId } = {}) => menus.bookmarkContextMenu(w, id, parentId));
+  ipcMain.handle('ui:bookmark-op', (event, op) => (registry.byUi(event.sender) ? editBookmarks(op) : null));
   ui('downloads:action', (_w, { id, what } = {}) => downloads.action(id, what));
   ui('downloads:clear', () => downloads.clearFinished());
 
@@ -474,18 +489,7 @@ function registerIpc() {
     return { blockedTotal: data.settings.get('blockedTotal'), recent };
   });
   ipcMain.handle('kitty:bookmarks', (event) => (fromPage(event, 'bookmarks') ? data.bookmarks.get('items') : []));
-  ipcMain.handle('kitty:bookmark-remove', (event, id) => {
-    if (fromPage(event, 'bookmarks')) removeBookmark(id);
-  });
-  ipcMain.handle('kitty:bookmark-rename', (event, id, title) => {
-    if (!fromPage(event, 'bookmarks')) return;
-    const items = data.bookmarks.get('items');
-    const b = items.find((x) => x.id === id);
-    if (!b) return;
-    b.title = String(title || '').slice(0, 300) || b.url;
-    data.bookmarks.set('items', items);
-    broadcastBookmarks();
-  });
+  ipcMain.handle('kitty:bookmark-op', (event, op) => (fromPage(event, 'bookmarks') ? editBookmarks(op) : null));
   ipcMain.handle('kitty:settings', (event) => (fromPage(event, 'settings') ? settingsSnapshot() : null));
   ipcMain.handle('kitty:settings-set', (event, key, value) => {
     if (!fromPage(event, 'settings') || !EDITABLE_SETTINGS[key]?.(value)) return settingsSnapshot();
@@ -617,7 +621,8 @@ app.whenReady().then(async () => {
     newPrivateWindow,
     openInternal,
     toggleBookmark,
-    removeBookmark,
+    editBookmarks,
+    bookmarkDialog,
     toggleBookmarksBar: () => {
       data.settings.set('showBookmarksBar', !data.settings.get('showBookmarksBar'));
       broadcastSettings();

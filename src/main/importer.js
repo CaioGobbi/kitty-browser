@@ -422,7 +422,7 @@ function mergeBookmarks(store, incoming) {
     const existing = known.get(b.url);
     if (existing) {
       // Only imported ones (they have `bar`): bookmarks saved with the star stay where they are.
-      if ('bar' in existing && !existing.folder?.length && folder.length) {
+      if ('bar' in existing && !existing.moved && !existing.folder?.length && folder.length) {
         existing.folder = folder;
         changed = true;
       }

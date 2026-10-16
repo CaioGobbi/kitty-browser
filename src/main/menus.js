@@ -1,10 +1,11 @@
 'use strict';
 
-const { Menu, clipboard, dialog, nativeImage } = require('electron');
+const { Menu, clipboard, dialog } = require('electron');
 
 const { data, engine, searchUrl } = require('./data');
 const { registry } = require('./registry');
 const downloads = require('./downloads');
+const bookmarks = require('./bookmarks');
 const { cleanUrl } = require('./privacy');
 
 /** Set by main.js so menus can open windows and toggle bookmarks. */
@@ -14,6 +15,8 @@ const actions = {
   openInternal: () => {},
   toggleBookmark: () => {},
   toggleBookmarksBar: () => {},
+  editBookmarks: () => ({}),
+  bookmarkDialog: () => {},
 };
 
 const current = () => registry.current();
@@ -353,71 +356,71 @@ function tabContextMenu(kwin, id) {
   ]).popup({ window: kwin.win });
 }
 
-function bookmarkContextMenu(kwin, id) {
-  const bookmark = data.bookmarks.get('items').find((b) => b.id === id);
-  if (!bookmark) return;
-  Menu.buildFromTemplate([
-    { label: 'Abrir em nova aba', click: () => kwin.createTab(bookmark.url) },
-    { label: 'Abrir em nova janela', click: () => actions.newWindow(bookmark.url) },
-    { label: 'Abrir em janela privativa', click: () => actions.newPrivateWindow(bookmark.url) },
-    { type: 'separator' },
-    { label: 'Copiar endereço', click: () => clipboard.writeText(bookmark.url) },
-    { label: 'Gerenciar favoritos', click: () => actions.openInternal('kitty://bookmarks') },
-    { type: 'separator' },
-    { label: 'Remover', click: () => actions.removeBookmark(id) },
-  ]).popup({ window: kwin.win });
-}
-
-/** Native menu image for a bookmark's inlined favicon (null when there's none, or it can't be decoded). */
-function menuIcon(favicon) {
-  if (!favicon?.startsWith('data:')) return null;
-  try {
-    const image = nativeImage.createFromDataURL(favicon);
-    return image.isEmpty() ? null : image.resize({ width: 16, height: 16, quality: 'best' });
-  } catch {
-    return null;
+/**
+ * Right click on the bookmarks bar: on a bookmark, a folder, or empty space
+ * (`id` null; `parentId` is the folder whose list was clicked, if any).
+ */
+function bookmarkContextMenu(kwin, id, parentId = null) {
+  const item = id ? bookmarks.find(id) : null;
+  if (id && !item) return;
+  const edit = (op) => actions.editBookmarks(op);
+  // New things go inside a clicked folder, or in the folder of the clicked bookmark.
+  const isFolder = item && bookmarks.isFolder(item);
+  const where = { parentId: isFolder ? item.id : item ? bookmarks.parentId(item) : parentId };
+  const creating = [
+    { label: 'Adicionar página…', click: () => actions.bookmarkDialog(kwin, { mode: 'add', ...where }) },
+    { label: 'Nova pasta…', click: () => actions.bookmarkDialog(kwin, { mode: 'folder', ...where }) },
+  ];
+  let template;
+  if (!item) {
+    template = creating;
+  } else if (isFolder) {
+    const all = bookmarks.descendants(item);
+    const inside = all.filter((b) => b.url);
+    const count = all.length;
+    template = [
+      {
+        label: `Abrir tudo (${inside.length})`,
+        enabled: inside.length > 0,
+        click: () => inside.forEach((b) => kwin.createTab(b.url, { activate: false })),
+      },
+      { type: 'separator' },
+      { label: 'Renomear…', click: () => actions.bookmarkDialog(kwin, { mode: 'rename', id, title: item.title }) },
+      {
+        label: 'Excluir pasta',
+        click: () => {
+          if (count) {
+            const answer = dialog.showMessageBoxSync(kwin.win, {
+              type: 'warning',
+              buttons: ['Excluir', 'Cancelar'],
+              defaultId: 1,
+              cancelId: 1,
+              message: `Excluir a pasta "${item.title}"?`,
+              detail: `Ela tem ${count} ${count === 1 ? 'item' : 'itens'}, que também serão excluídos.`,
+            });
+            if (answer !== 0) return;
+          }
+          edit({ op: 'remove', id });
+        },
+      },
+      { type: 'separator' },
+      ...creating,
+    ];
+  } else {
+    template = [
+      { label: 'Abrir em nova aba', click: () => kwin.createTab(item.url) },
+      { label: 'Abrir em nova janela', click: () => actions.newWindow(item.url) },
+      { label: 'Abrir em janela privativa', click: () => actions.newPrivateWindow(item.url) },
+      { type: 'separator' },
+      { label: 'Editar…', click: () => actions.bookmarkDialog(kwin, { mode: 'edit', id, title: item.title, url: item.url }) },
+      { label: 'Copiar endereço', click: () => clipboard.writeText(item.url) },
+      { label: 'Excluir', click: () => edit({ op: 'remove', id }) },
+      { type: 'separator' },
+      ...creating,
+    ];
   }
+  template.push({ type: 'separator' }, { label: 'Gerenciar favoritos', click: () => actions.openInternal('kitty://bookmarks') });
+  Menu.buildFromTemplate(template).popup({ window: kwin.win });
 }
 
-/** Menu labels: shortened, and with `&` kept literal on Windows/Linux (it marks access keys there). */
-function menuLabel(text) {
-  const label = text.length > 60 ? `${text.slice(0, 59)}…` : text;
-  return process.platform === 'darwin' ? label : label.replace(/&/g, '&&');
-}
-
-/** Pops up the contents of a top-level folder of the bookmarks bar, with its subfolders as submenus. */
-function bookmarkFolderMenu(kwin, name, x, y) {
-  const inFolder = data.bookmarks.get('items').filter((b) => b.bar !== false && b.folder?.[0] === name);
-  if (!inFolder.length) return;
-  // Keeps the original order: subfolders where their first bookmark appears.
-  const build = (items, depth) => {
-    const template = [];
-    const subfolders = new Map();
-    for (const b of items) {
-      const sub = b.folder[depth];
-      if (sub == null) {
-        template.push({
-          label: menuLabel(b.title || b.url),
-          icon: menuIcon(b.favicon) || undefined,
-          click: (_item, _win, event) => {
-            if (event?.metaKey || event?.ctrlKey) kwin.createTab(b.url, { activate: false });
-            else kwin.navigate(b.url);
-          },
-        });
-      } else if (!subfolders.has(sub)) {
-        const entry = { label: menuLabel(sub), items: [] };
-        subfolders.set(sub, entry);
-        template.push(entry);
-      }
-      if (sub != null) subfolders.get(sub).items.push(b);
-    }
-    return template.map((entry) =>
-      entry.items ? { label: entry.label, submenu: build(entry.items, depth + 1) } : entry,
-    );
-  };
-  const popup = { window: kwin.win };
-  if (Number.isFinite(x) && Number.isFinite(y)) Object.assign(popup, { x: Math.round(x), y: Math.round(y) });
-  Menu.buildFromTemplate(build(inFolder, 1)).popup(popup);
-}
-
-module.exports = { actions, buildAppMenu, handleShortcut, pageContextMenu, tabContextMenu, bookmarkContextMenu, bookmarkFolderMenu };
+module.exports = { actions, buildAppMenu, handleShortcut, pageContextMenu, tabContextMenu, bookmarkContextMenu };

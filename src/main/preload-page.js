@@ -14,8 +14,7 @@ if (location.protocol === 'kitty:') {
     removeHistory: invoke('kitty:history-remove'),
     clearHistory: invoke('kitty:history-clear'),
     bookmarks: invoke('kitty:bookmarks'),
-    removeBookmark: invoke('kitty:bookmark-remove'),
-    renameBookmark: invoke('kitty:bookmark-rename'),
+    bookmarkOp: invoke('kitty:bookmark-op'),
     bypassThreat: invoke('kitty:threat-bypass'),
     passwords: {
       list: invoke('kitty:passwords'),

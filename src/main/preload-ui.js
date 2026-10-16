@@ -33,7 +33,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
   toggleBookmark: send('bookmark:toggle'),
   openBookmark: send('bookmark:open'),
   bookmarkMenu: send('bookmark:menu'),
-  bookmarkFolder: send('bookmark:folder'),
+  bookmarkOp: (op) => ipcRenderer.invoke('ui:bookmark-op', op),
   downloadAction: send('downloads:action'),
   clearDownloads: send('downloads:clear'),
   installUpdate: send('update:install'),
@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('kittyUI', {
 
   onState: on('tabs:state'),
   onBookmarks: on('bookmarks:state'),
+  onBookmarkDialog: on('bookmark:dialog'),
   onDownloads: on('downloads:state'),
   onDownloadStarted: on('downloads:started'),
   onToggleDownloads: on('downloads:toggle'),
