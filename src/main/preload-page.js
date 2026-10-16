@@ -16,6 +16,10 @@ if (location.protocol === 'kitty:') {
     bookmarks: invoke('kitty:bookmarks'),
     bookmarkOp: invoke('kitty:bookmark-op'),
     bypassThreat: invoke('kitty:threat-bypass'),
+    site: {
+      get: invoke('kitty:site'),
+      set: invoke('kitty:site-set'),
+    },
     passwords: {
       list: invoke('kitty:passwords'),
       reveal: invoke('kitty:password-reveal'),

@@ -415,23 +415,38 @@ body.private #private-badge {
 }
 
 #site-icon {
-  display: grid;
-  place-items: center;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  min-width: 24px;
+  margin-left: -7px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
   color: var(--muted);
+}
+#site-icon:not(:disabled):hover,
+#site-icon.open {
+  background: var(--popup-hover);
+  color: var(--text);
+}
+#site-icon:disabled {
+  cursor: default;
 }
 #site-icon svg {
   display: none;
+  flex: none;
   width: 14px;
   height: 14px;
 }
-#site-icon[data-kind='lock'] .i-lock,
+#site-icon[data-kind='lock'] .i-tune,
 #site-icon[data-kind='insecure'] .i-insecure,
 #site-icon[data-kind='search'] .i-search,
 #site-icon[data-kind='kitty'] .i-kitty {
   display: block;
-}
-#site-icon[data-kind='lock'] {
-  color: var(--ok);
 }
 #site-icon[data-kind='insecure'] {
   color: var(--warn);
@@ -442,7 +457,6 @@ body.private #private-badge {
 }
 #insecure-label {
   display: none;
-  flex: none;
   color: var(--warn);
   font-size: 12px;
   font-weight: 600;

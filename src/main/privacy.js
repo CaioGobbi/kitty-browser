@@ -8,7 +8,7 @@ const crypto = require('node:crypto');
 const { ipcMain } = require('electron');
 const { Request, fromElectronDetails } = require('@ghostery/adblocker-electron');
 
-const { data, isShieldUp, originOf } = require('./data');
+const { data, isShieldUp, hostOf, originOf } = require('./data');
 const { registry } = require('./registry');
 const lists = require('./lists');
 
@@ -492,7 +492,7 @@ function registerPrivacyIpc() {
     const found = registry.tabByWebContentsId(event.sender.id);
     const top = found ? found.tab.view.webContents.getURL() || frameUrl : frameUrl;
     const enabled =
-      data.settings.get('antiFingerprinting') && /^https?:/.test(String(frameUrl)) && isShieldUp(top);
+      data.settings.get('antiFingerprinting') && /^https?:/.test(String(frameUrl)) && isShieldUp(top) && isFingerprintProtected(top);
     const key = fingerprintKeys.get(event.sender.session) || Buffer.alloc(16);
     const seed = crypto.createHmac('sha256', key).update(siteOf(top) || 'none').digest().readUInt32LE(0);
     event.returnValue = { enabled, seed, skip: fingerprintExceptionsFor(top) };
@@ -505,6 +505,39 @@ function permissionList() {
     for (const [permission, value] of Object.entries(perms)) out.push({ origin, permission, value });
   }
   return out.sort((a, b) => a.origin.localeCompare(b.origin));
+}
+
+/** Whether Kitty tried HTTPS for this host this run and had to go back to HTTP. */
+function fellBackToHttp(hostname) {
+  return httpFallbackHosts.has(hostname);
+}
+
+/** Per-site fingerprinting switch (site info panel): hosts where it's off. */
+function isFingerprintProtected(url) {
+  return !(data.settings.get('fingerprintOff') || []).includes(hostOf(url));
+}
+
+function setFingerprintProtected(host, on) {
+  const off = (data.settings.get('fingerprintOff') || []).filter((h) => h !== host);
+  data.settings.set('fingerprintOff', on ? off : [...off, host]);
+}
+
+/** A site's decisions, from the window's own store (private windows keep theirs in memory). */
+function sitePermissions(kwin, origin) {
+  return { ...decisionStore(kwin)[origin] };
+}
+
+/** 'allow' or 'deny' saves the decision; anything else forgets it, so the site asks again. */
+function setSitePermission(kwin, origin, permission, value) {
+  const store = decisionStore(kwin);
+  if (value === 'allow' || value === 'deny') {
+    saveDecision(kwin, origin, [permission], value === 'allow');
+    return;
+  }
+  if (!store[origin]) return;
+  delete store[origin][permission];
+  if (Object.keys(store[origin]).length === 0) delete store[origin];
+  if (!kwin?.isPrivate) data.settings.set('permissions', store);
 }
 
 function removePermission(origin, permission) {
@@ -523,4 +556,11 @@ module.exports = {
   bypassThreat,
   permissionList,
   removePermission,
+  siteOf,
+  fellBackToHttp,
+  isFingerprintProtected,
+  setFingerprintProtected,
+  sitePermissions,
+  setSitePermission,
+  PROMPTED,
 };

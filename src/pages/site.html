@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
+    <title>Configurações do site</title>
+    <link rel="stylesheet" href="pages.css" />
+    <link rel="stylesheet" href="settings.css" />
+    <link rel="stylesheet" href="site.css" />
+  </head>
+  <body>
+    <main>
+      <a class="back" href="kitty://settings">‹ Configurações</a>
+      <h1 id="host">Configurações do site</h1>
+      <p id="origin" class="lead"></p>
+      <p id="private-note" class="lead" hidden>Janela privativa: o que você mudar aqui vale só até fechar esta janela (escudos e fingerprinting valem para todas).</p>
+      <p id="invalid" hidden>Endereço de site inválido.</p>
+
+      <div id="content" hidden>
+        <section>
+          <h2>Permissões</h2>
+          <div id="permissions"></div>
+        </section>
+
+        <section>
+          <h2>Proteções do Kitty</h2>
+          <label class="row">
+            <span><strong>Escudos</strong><small>Bloqueia anúncios e rastreadores, cookies de terceiros e parâmetros de rastreamento neste site</small></span>
+            <input type="checkbox" class="toggle" id="shield" />
+          </label>
+          <label class="row">
+            <span><strong>Proteção contra fingerprinting</strong><small id="fingerprint-detail"></small></span>
+            <input type="checkbox" class="toggle" id="fingerprint" />
+          </label>
+          <label class="row">
+            <span><strong>Oferecer salvar senhas</strong><small>Pergunta se você quer guardar a senha quando entrar neste site</small></span>
+            <input type="checkbox" class="toggle" id="passwords" />
+          </label>
+        </section>
+
+        <section>
+          <h2>Dados do site</h2>
+          <div class="row">
+            <span><strong id="cookies"></strong><small>Cookies, armazenamento local, bancos de dados e cache de <span id="site"></span></small></span>
+            <button id="clear" class="danger">Apagar dados</button>
+          </div>
+        </section>
+
+        <div class="footer">
+          <button id="reset">Redefinir permissões e proteções</button>
+          <span id="done" class="status" hidden></span>
+        </div>
+      </div>
+    </main>
+    <script src="site.js"></script>
+  </body>
+</html>

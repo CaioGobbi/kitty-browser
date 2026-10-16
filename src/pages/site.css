@@ -1,0 +1,6 @@
+.back { display: inline-block; margin-bottom: 14px; color: var(--muted); font-size: 13px; }
+.back:hover { color: var(--text); }
+h1 { margin-bottom: 4px; overflow-wrap: anywhere; }
+.lead { margin: 0 0 22px; color: var(--muted); }
+#private-note { margin-top: -14px; }
+.footer { display: flex; align-items: center; }

@@ -16,6 +16,7 @@ const gestures = require('./gestures');
 const importer = require('./importer');
 const bookmarkEdits = require('./bookmarks');
 const passwords = require('./passwords');
+const siteinfo = require('./siteinfo');
 const menus = require('./menus');
 const { KittyWindow, hooks, NEW_TAB_URL } = require('./window');
 const tabdrag = require('./tabdrag');
@@ -62,6 +63,7 @@ const pendingUrls = [];
 function setupProfile(ses, { isPrivate }) {
   registerKittyProtocol(ses);
   privacy.setupSession(ses);
+  siteinfo.attach(ses);
   downloads.attach(ses, { isPrivate });
 }
 
@@ -683,6 +685,7 @@ app.whenReady().then(async () => {
   privacy.registerPrivacyIpc();
   registerIpc();
   passwords.registerIpc({ fromPage, openPasswords: () => openInternal('kitty://passwords') });
+  siteinfo.registerIpc({ fromPage, openInternal });
   menus.buildAppMenu();
   const listsReady = lists.init({ canUpdate: () => allowed('autoUpdateLists') });
 

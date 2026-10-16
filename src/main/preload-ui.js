@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld('kittyUI', {
   clearDownloads: send('downloads:clear'),
   installUpdate: send('update:install'),
   suggest: (text) => ipcRenderer.invoke('ui:suggest', text),
+  siteInfo: () => ipcRenderer.invoke('ui:site-info'),
+  siteAction: (action) => ipcRenderer.invoke('ui:site-action', action),
 
   onState: on('tabs:state'),
   onBookmarks: on('bookmarks:state'),
