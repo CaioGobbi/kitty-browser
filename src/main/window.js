@@ -170,7 +170,7 @@ class KittyWindow {
 
   tabState(tab) {
     const wc = tab.view.webContents;
-    const url = tab.pendingUrl || wc.getURL();
+    const url = tab.pendingUrl || wc.getURL() || tab.startUrl;
     const internal = isInternal(url);
     const prompt = tab.prompts[0];
     return {
@@ -285,6 +285,7 @@ class KittyWindow {
       favicon,
       prompts: [],
       pendingUrl: lazy ? url : null,
+      startUrl: url, // shown until the first page commits (getURL() is '' before that)
       pendingTitle: title,
       pinned,
       pendingLogin: null, // a login form the page just submitted (passwords.js)
@@ -440,7 +441,7 @@ class KittyWindow {
     this.sendState();
 
     if (!focus) return;
-    const url = tab.view.webContents.getURL();
+    const url = tab.view.webContents.getURL() || tab.startUrl;
     if (!url || isInternal(url)) {
       this.focusAddressBar();
       // A page that hasn't loaded yet takes the focus when Chromium sets it up:
