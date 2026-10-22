@@ -114,10 +114,22 @@ function firefoxUserAgent() {
 }
 
 function useSigninUserAgent(wc) {
+  const uaFor = (url) => (hostOf(url) === GOOGLE_SIGNIN_HOST ? firefoxUserAgent() : app.userAgentFallback);
   wc.on('did-start-navigation', (details) => {
     if (!details.isMainFrame || details.isSameDocument) return;
-    const ua = hostOf(details.url) === GOOGLE_SIGNIN_HOST ? firefoxUserAgent() : app.userAgentFallback;
+    const ua = uaFor(details.url);
     if (wc.getUserAgent() !== ua) wc.setUserAgent(ua);
+  });
+  // Most visits arrive by redirect (Gmail, YouTube, "Sign in with Google").
+  // Changing the user agent mid-redirect crashes Chromium, so the redirect
+  // becomes a new navigation instead.
+  wc.on('will-redirect', (event) => {
+    if (!event.isMainFrame) return;
+    const ua = uaFor(event.url);
+    if (wc.getUserAgent() === ua) return;
+    event.preventDefault();
+    wc.setUserAgent(ua);
+    wc.loadURL(event.url).catch(() => {});
   });
 }
 
