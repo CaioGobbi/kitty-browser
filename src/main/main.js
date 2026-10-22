@@ -97,6 +97,31 @@ function cleanUserAgent(ua) {
 }
 
 /**
+ * Google's sign-in refuses Chromium builds it doesn't recognize as Chrome
+ * ("This browser or app may not be secure"), and Electron is one of them.
+ * The same page accepts Firefox, so only accounts.google.com is told Kitty is
+ * Firefox (on the version released alongside this Chromium). Popups included.
+ */
+const GOOGLE_SIGNIN_HOST = 'accounts.google.com';
+
+function firefoxUserAgent() {
+  const os = {
+    darwin: 'Macintosh; Intel Mac OS X 10.15',
+    win32: 'Windows NT 10.0; Win64; x64',
+  }[process.platform] || 'X11; Linux x86_64';
+  const version = parseInt(process.versions.chrome, 10) + 1;
+  return `Mozilla/5.0 (${os}; rv:${version}.0) Gecko/20100101 Firefox/${version}.0`;
+}
+
+function useSigninUserAgent(wc) {
+  wc.on('did-start-navigation', (details) => {
+    if (!details.isMainFrame || details.isSameDocument) return;
+    const ua = hostOf(details.url) === GOOGLE_SIGNIN_HOST ? firefoxUserAgent() : app.userAgentFallback;
+    if (wc.getUserAgent() !== ua) wc.setUserAgent(ua);
+  });
+}
+
+/**
  * Encrypted DNS: falls back to the system resolver only if the provider can't
  * be reached. Chromium probes the provider at startup, so it waits for kitty://setup.
  */
@@ -701,6 +726,7 @@ app.whenReady().then(async () => {
 
   downloads.loadLog();
   app.userAgentFallback = cleanUserAgent(app.userAgentFallback);
+  app.on('web-contents-created', (_e, wc) => useSigninUserAgent(wc));
   applyDns();
   applyTheme();
 
