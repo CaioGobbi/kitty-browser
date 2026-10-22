@@ -16,6 +16,13 @@ function protect(seed, farble, skip = []) {
 
   // Global Privacy Control (https://globalprivacycontrol.org) — matches the Sec-GPC header.
   if (!('globalPrivacyControl' in Navigator.prototype)) define(Navigator.prototype, 'globalPrivacyControl', () => true);
+  // Sites (WhatsApp, Gmail…) put an unread count on the Dock icon through the
+  // Badging API; the Kitty keeps its icon clean, so the calls do nothing.
+  for (const name of ['setAppBadge', 'clearAppBadge']) {
+    if (typeof Navigator.prototype[name] === 'function') {
+      Navigator.prototype[name] = new Proxy(Navigator.prototype[name], { apply: () => Promise.resolve() });
+    }
+  }
   if (!farble) return;
 
   // Proxies keep Function.prototype.toString returning "[native code]".
