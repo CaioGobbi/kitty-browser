@@ -571,16 +571,31 @@ function registerIpc() {
   ipcMain.handle('kitty:stats', (event) => {
     if (!fromPage(event, 'newtab')) return null;
     const found = registry.tabByWebContentsId(event.sender.id);
-    const recent = [];
-    const seen = new Set();
+    // The most used sites: each visit counts, and its weight halves every 14
+    // days, so the sites in use now beat old habits and one-off visits.
+    let recent = [];
     if (!found?.kwin.isPrivate) {
+      const now = Date.now();
+      const byHost = new Map();
       for (const e of data.history.get('entries')) {
         const host = hostOf(e.url);
-        if (seen.has(host)) continue;
-        seen.add(host);
-        recent.push({ host, url: e.url, title: e.title, favicon: data.favicons.get('icons')[host]?.data || null });
-        if (recent.length === 8) break;
+        if (!host) continue;
+        const weight = 0.5 ** ((now - e.time) / (14 * 86_400_000));
+        const site = byHost.get(host) || { host, score: 0, pages: new Map() };
+        site.score += weight;
+        const page = site.pages.get(e.url) || { url: e.url, title: e.title, score: 0 };
+        page.score += weight;
+        site.pages.set(e.url, page);
+        byHost.set(host, site);
       }
+      recent = [...byHost.values()]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8)
+        .map((site) => {
+          // The page of that site visited the most (entries are newest first, so ties keep the latest).
+          const page = [...site.pages.values()].reduce((best, p) => (p.score > best.score ? p : best));
+          return { host: site.host, url: page.url, title: page.title, favicon: data.favicons.get('icons')[site.host]?.data || null };
+        });
     }
     return { blockedTotal: data.settings.get('blockedTotal'), recent };
   });
