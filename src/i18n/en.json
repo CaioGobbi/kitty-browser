@@ -529,5 +529,18 @@
   "Dados do site": "Site data",
   "Cookies, armazenamento local, bancos de dados e cache de": "Cookies, local storage, databases and cache of",
   "Apagar dados": "Delete data",
-  "Redefinir permissões e proteções": "Reset permissions and protections"
+  "Redefinir permissões e proteções": "Reset permissions and protections",
+  "Modo do desenvolvedor": "Developer mode",
+  "Carregar sem compactação": "Load unpacked",
+  "Sem compactação": "Unpacked",
+  "ID": "ID",
+  "Carregada de": "Loaded from",
+  "Inspecionar página de fundo": "Inspect background page",
+  "Remover “{name}”? O Kitty deixa de carregá-la, mas a pasta não é apagada.": "Remove “{name}”? Kitty will stop loading it, but its folder won't be deleted.",
+  "O Kitty deixa de carregar a extensão. A pasta dela não é apagada.": "Kitty will stop loading the extension. Its folder won't be deleted.",
+  "Carregar extensão sem compactação": "Load unpacked extension",
+  "Selecionar": "Select",
+  "Não foi possível carregar a extensão": "Couldn't load the extension",
+  "A pasta não tem um arquivo manifest.json.": "The folder has no manifest.json file.",
+  "A pasta ou o manifest.json não existe mais.": "The folder or its manifest.json no longer exists."
 }

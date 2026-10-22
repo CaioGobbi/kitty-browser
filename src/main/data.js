@@ -63,6 +63,8 @@ const SETTING_DEFAULTS = {
   // Chrome extensions (extensions.js): ids switched off, and ids pinned to the toolbar in order
   extensionsDisabled: [],
   extensionsPinned: [],
+  extensionsDevMode: false, // kitty://extensions shows the developer tools (load unpacked, reload, ids)
+  extensionsUnpacked: [], // folders loaded in developer mode: [{ id, path }]
 };
 
 /** When the bookmarks bar shows: see `bookmarksBar` above. */

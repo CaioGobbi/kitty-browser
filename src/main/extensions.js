@@ -27,6 +27,10 @@ const justInstalled = new Map(); // id → KittyWindow
 
 const disabledIds = () => data.settings.get('extensionsDisabled');
 const pinnedIds = () => data.settings.get('extensionsPinned');
+/** Developer mode: folders loaded with "Carregar sem compactação", as [{ id, path }]. */
+const unpackedList = () => data.settings.get('extensionsUnpacked');
+/** Why an extension did not load (shown in developer mode): id → message. */
+const loadErrors = new Map();
 
 // ---------------------------------------------------------------------------
 // What is on disk
@@ -36,9 +40,7 @@ function discover() {
   let ids = [];
   try {
     ids = fs.readdirSync(extDir).filter((id) => /^[a-p]{32}$/.test(id));
-  } catch {
-    return [];
-  }
+  } catch {} // no Web Store extension yet
   const found = [];
   for (const id of ids) {
     const versions = [];
@@ -58,7 +60,19 @@ function discover() {
     };
     if (versions.length) found.push(versions.sort(newer)[0]);
   }
-  return found;
+  // Unpacked folders (developer mode) win over a Web Store copy with the same id.
+  const unpacked = unpackedList().map(({ id, path: dir }) => {
+    let manifest;
+    try {
+      manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+    } catch (err) {
+      manifest = { name: path.basename(dir), version: '' };
+      if (!loadErrors.has(id)) loadErrors.set(id, err.code === 'ENOENT' ? t('A pasta ou o manifest.json não existe mais.') : err.message);
+    }
+    return { id, path: dir, manifest, unpacked: true };
+  });
+  const unpackedIds = new Set(unpacked.map((e) => e.id));
+  return [...found.filter((e) => !unpackedIds.has(e.id)), ...unpacked];
 }
 
 /** A manifest text in the person's language ("__MSG_name__" placeholders). */
@@ -80,7 +94,14 @@ function localized(entry, key) {
 }
 
 async function load(entry) {
-  const ext = await ses.extensions.loadExtension(entry.path);
+  loadErrors.delete(entry.id);
+  let ext;
+  try {
+    ext = await ses.extensions.loadExtension(entry.path);
+  } catch (err) {
+    loadErrors.set(entry.id, err.message);
+    throw err;
+  }
   if (ext.manifest.manifest_version >= 3 && ext.manifest.background?.service_worker) {
     await ses.serviceWorkers.startWorkerForScope(`chrome-extension://${ext.id}/`).catch(() => {});
   }
@@ -165,9 +186,80 @@ function list() {
       pinned: pinnedIds().includes(entry.id),
       icon: api.extensionIcon(ext || { id: entry.id, path: entry.path, version: entry.manifest.version, manifest: entry.manifest }, 48),
       hasOptions: !!(entry.manifest.options_ui?.page || entry.manifest.options_page),
-      storeUrl: `${WEB_STORE}detail/${entry.id}`,
+      storeUrl: entry.unpacked ? null : `${WEB_STORE}detail/${entry.id}`,
+      unpacked: !!entry.unpacked,
+      path: entry.path,
+      error: loadErrors.get(entry.id) || null,
+      inspectable: !!ext && ext.manifest.manifest_version < 3 && !!ext.manifest.background, // MV2 background page
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Developer mode, like chrome://extensions
+
+/** An MV2 extension's background page, if it has one running. */
+function backgroundPage(id) {
+  return webContents.getAllWebContents().find((wc) => wc.getType() === 'backgroundPage' && wc.getURL().startsWith(`chrome-extension://${id}/`));
+}
+
+/** "Carregar sem compactação": picks a folder with a manifest.json and loads it as is. */
+async function loadUnpacked(kwin) {
+  const options = { title: t('Carregar extensão sem compactação'), buttonLabel: t('Selecionar'), properties: ['openDirectory'] };
+  const { canceled, filePaths } = kwin ? await dialog.showOpenDialog(kwin.win, options) : await dialog.showOpenDialog(options);
+  if (canceled || !filePaths[0]) return;
+  const dir = filePaths[0];
+  const fail = (detail) => {
+    const box = { type: 'error', message: t('Não foi possível carregar a extensão'), detail: `${dir}\n\n${detail}` };
+    return kwin ? dialog.showMessageBox(kwin.win, box) : dialog.showMessageBox(box);
+  };
+  if (!fs.existsSync(path.join(dir, 'manifest.json'))) return fail(t('A pasta não tem um arquivo manifest.json.'));
+  const known = unpackedList().find((e) => e.path === dir);
+  if (known && ses.extensions.getExtension(known.id)) ses.extensions.removeExtension(known.id);
+  let ext;
+  try {
+    ext = await ses.extensions.loadExtension(dir);
+  } catch (err) {
+    // Same id as an extension already loaded (a manifest "key"): the folder replaces it, as in Chrome.
+    const clash = /already loaded|already exists/i.test(err.message) && ses.extensions.getAllExtensions().find((e) => e.path !== dir && sameManifestKey(e, dir));
+    if (!clash) return fail(err.message);
+    ses.extensions.removeExtension(clash.id);
+    try {
+      ext = await ses.extensions.loadExtension(dir);
+    } catch (err2) {
+      return fail(err2.message);
+    }
+  }
+  loadErrors.delete(ext.id);
+  data.settings.set('extensionsUnpacked', [...unpackedList().filter((e) => e.path !== dir && e.id !== ext.id), { id: ext.id, path: dir }]);
+  data.settings.set('extensionsDisabled', disabledIds().filter((x) => x !== ext.id));
+  if (ext.manifest.manifest_version >= 3 && ext.manifest.background?.service_worker) {
+    await ses.serviceWorkers.startWorkerForScope(`chrome-extension://${ext.id}/`).catch(() => {});
+  }
+  broadcast();
+}
+
+function sameManifestKey(ext, dir) {
+  try {
+    const key = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')).key;
+    return !!key && ext.manifest.key === key;
+  } catch {
+    return false;
+  }
+}
+
+/** Reloads an extension from disk (the ↻ in Chrome's developer mode); null = every unpacked one. */
+async function reload(id) {
+  const entries = discover().filter((e) => (id ? e.id === id : e.unpacked) && !disabledIds().includes(e.id));
+  for (const entry of entries) {
+    if (ses.extensions.getExtension(entry.id)) ses.extensions.removeExtension(entry.id);
+    await load(entry).catch((err) => console.error(`[kitty] extensão ${entry.id} não recarregou:`, err.message));
+  }
+  broadcast();
+}
+
+function inspect(id) {
+  backgroundPage(id)?.openDevTools({ mode: 'detach' });
 }
 
 async function setEnabled(id, enabled) {
@@ -191,7 +283,12 @@ function setPinned(id, pinned) {
 
 async function uninstall(id) {
   if (!/^[a-p]{32}$/.test(id)) return;
-  await webStore.uninstallExtension(id, { session: ses, extensionsPath: extDir });
+  loadErrors.delete(id);
+  if (unpackedList().some((e) => e.id === id)) {
+    // An unpacked folder is the developer's own: Kitty forgets it but never deletes it.
+    if (ses.extensions.getExtension(id)) ses.extensions.removeExtension(id);
+    data.settings.set('extensionsUnpacked', unpackedList().filter((e) => e.id !== id));
+  } else await webStore.uninstallExtension(id, { session: ses, extensionsPath: extDir });
   data.settings.set('extensionsPinned', pinnedIds().filter((x) => x !== id));
   data.settings.set('extensionsDisabled', disabledIds().filter((x) => x !== id));
   broadcast();
@@ -206,7 +303,9 @@ async function confirmUninstall(kwin, id) {
     defaultId: 0,
     cancelId: 1,
     message: t('Remover “{name}”?', { name: item.name }),
-    detail: t('A extensão e os dados que ela guardou no Kitty serão apagados.'),
+    detail: item.unpacked
+      ? t('O Kitty deixa de carregar a extensão. A pasta dela não é apagada.')
+      : t('A extensão e os dados que ela guardou no Kitty serão apagados.'),
   });
   if (response === 0) await uninstall(id);
 }
@@ -336,10 +435,19 @@ function registerIpc({ fromPage }) {
     await webStore.updateExtensions(ses).catch((err) => console.error('[kitty] extension updates', err));
   });
   page('kitty:extensions-auto-update', (_e, on) => data.settings.set('autoUpdateExtensions', !!on));
+  page('kitty:extensions-dev-mode', (_e, on) => data.settings.set('extensionsDevMode', !!on));
+  page('kitty:extensions-load-unpacked', (e) => loadUnpacked(registry.tabByWebContentsId(e.sender.id)?.kwin));
+  page('kitty:extensions-reload', (_e, id) => reload(id ? String(id) : null));
+  page('kitty:extensions-inspect', (_e, id) => inspect(String(id)));
 }
 
 function snapshot() {
-  return { extensions: list(), autoUpdate: !!data.settings.get('autoUpdateExtensions'), storeUrl: WEB_STORE };
+  return {
+    extensions: list(),
+    autoUpdate: !!data.settings.get('autoUpdateExtensions'),
+    devMode: !!data.settings.get('extensionsDevMode'),
+    storeUrl: WEB_STORE,
+  };
 }
 
 /** The page's right-click menu gets the extensions' items. */

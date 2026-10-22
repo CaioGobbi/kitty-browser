@@ -64,6 +64,10 @@ if (location.protocol === 'kitty:') {
       store: invoke('kitty:extensions-store'),
       update: invoke('kitty:extensions-update'),
       setAutoUpdate: invoke('kitty:extensions-auto-update'),
+      setDevMode: invoke('kitty:extensions-dev-mode'),
+      loadUnpacked: invoke('kitty:extensions-load-unpacked'),
+      reload: invoke('kitty:extensions-reload'),
+      inspect: invoke('kitty:extensions-inspect'),
     },
     passwords: {
       list: invoke('kitty:passwords'),

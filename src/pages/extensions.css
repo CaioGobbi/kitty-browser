@@ -1,5 +1,9 @@
 main { max-width: 760px; margin: 0 auto; padding: 40px 24px; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.devmode { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.dev-only { display: none; gap: 8px; }
+.devmode-on .dev-only { display: flex; }
 h1 { margin: 0; font-size: 26px; }
 button.primary { border-color: var(--accent); background: var(--accent); color: #1a1020; font-weight: 600; }
 button.primary:hover { filter: brightness(1.08); background: var(--accent); }
@@ -18,3 +22,7 @@ button.primary:hover { filter: brightness(1.08); background: var(--accent); }
 #empty { color: var(--muted); }
 .auto { display: flex; align-items: center; gap: 10px; margin-top: 28px; color: var(--muted); }
 .auto span { flex: 1; }
+.ext .tag { font-size: 11px; margin-left: 8px; padding: 1px 6px; border-radius: 6px; background: var(--line); font-weight: 500; }
+.ext .dev { color: var(--muted); font-size: 12px; font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+.ext .error { color: var(--danger); font-size: 12px; margin: 4px 0; overflow-wrap: anywhere; }
+.ext .dev + .actions, .ext .error + .actions { margin-top: 10px; }
