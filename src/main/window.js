@@ -253,7 +253,7 @@ class KittyWindow {
     return {
       tabs: this.order.map((id) => {
         const s = this.tabState(this.tabs.get(id));
-        return { url: s.url, title: s.title, favicon: s.favicon, pinned: s.pinned };
+        return { url: s.url, title: s.title, favicon: s.favicon, pinned: s.pinned, muted: s.muted };
       }),
       active: Math.max(0, this.order.indexOf(this.activeId)),
     };
@@ -262,7 +262,7 @@ class KittyWindow {
   // -------------------------------------------------------------------------
   // Tabs
 
-  createTab(url = NEW_TAB_URL, { activate = true, index = null, lazy = false, title = '', favicon = null, pinned = false } = {}) {
+  createTab(url = NEW_TAB_URL, { activate = true, index = null, lazy = false, title = '', favicon = null, pinned = false, muted = false } = {}) {
     const view = new WebContentsView({
       webPreferences: {
         session: this.session,
@@ -277,6 +277,7 @@ class KittyWindow {
     // addresses (and the real IP behind a split VPN) aren't exposed to sites.
     wc.setWebRTCIPHandlingPolicy('default_public_interface_only');
     listenForShortcuts(wc);
+    if (muted) wc.setAudioMuted(true);
     const tab = {
       id: wc.id,
       owner: this, // the KittyWindow showing this tab; changes when the tab moves
@@ -411,6 +412,7 @@ class KittyWindow {
         title: t.title,
         favicon: t.favicon,
         pinned: !!t.pinned,
+        muted: !!t.muted,
       });
     });
     this.switchTab(this.order[activeIndex]);
