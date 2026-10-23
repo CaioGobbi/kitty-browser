@@ -542,5 +542,8 @@
   "Selecionar": "Select",
   "Não foi possível carregar a extensão": "Couldn't load the extension",
   "A pasta não tem um arquivo manifest.json.": "The folder has no manifest.json file.",
-  "A pasta ou o manifest.json não existe mais.": "The folder or its manifest.json no longer exists."
+  "A pasta ou o manifest.json não existe mais.": "The folder or its manifest.json no longer exists.",
+  "Sair": "Leave",
+  "Sair do site?": "Leave site?",
+  "As alterações que você fez podem não ser salvas.": "Changes you made may not be saved."
 }

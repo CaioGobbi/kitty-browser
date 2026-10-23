@@ -3,7 +3,7 @@
 // One Kitty browser window: the browser UI (tab strip, toolbar, bars) as a
 // WebContentsView on top, and one WebContentsView per tab below it.
 const path = require('node:path');
-const { BaseWindow, WebContentsView, nativeTheme, session } = require('electron');
+const { BaseWindow, WebContentsView, dialog, nativeTheme, session } = require('electron');
 
 const { data, searchUrl, isInternal, isShieldUp, isBookmarked, originOf } = require('./data');
 const { registry } = require('./registry');
@@ -278,6 +278,19 @@ class KittyWindow {
     wc.setWebRTCIPHandlingPolicy('default_public_interface_only');
     listenForShortcuts(wc);
     if (muted) wc.setAudioMuted(true);
+    // A page that asks before leaving (beforeunload): Electron silently keeps
+    // it unless someone answers, so reloading or leaving did nothing.
+    wc.on('will-prevent-unload', (event) => {
+      const choice = dialog.showMessageBoxSync(tab.owner.win, {
+        type: 'question',
+        buttons: [t('Sair'), t('Cancelar')],
+        defaultId: 0,
+        cancelId: 1,
+        message: t('Sair do site?'),
+        detail: t('As alterações que você fez podem não ser salvas.'),
+      });
+      if (choice === 0) event.preventDefault();
+    });
     const tab = {
       id: wc.id,
       owner: this, // the KittyWindow showing this tab; changes when the tab moves
