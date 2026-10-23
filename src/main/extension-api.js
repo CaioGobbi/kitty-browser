@@ -1053,6 +1053,75 @@ function openOptions(ext) {
   return true;
 }
 
+// chrome.identity: sign-in on a site's own page (launchWebAuthFlow), which ends
+// at https://<extension id>.chromiumapp.org/. Kitty has no Google account, so
+// getAuthToken fails like a Chrome that isn't signed in.
+function launchWebAuthFlow(ctx, details = {}) {
+  const redirect = `https://${ctx.ext.id}.chromiumapp.org/`;
+  const interactive = !!details.interactive;
+  return new Promise((resolve, reject) => {
+    const bw = new BrowserWindow({
+      width: 500,
+      height: 680,
+      show: false,
+      title: ctx.ext.name,
+      autoHideMenuBar: true,
+      webPreferences: { session: ses, sandbox: true, contextIsolation: true },
+    });
+    const wc = bw.webContents;
+    let done = false;
+    let timer = null;
+    const finish = (err, url) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (!bw.isDestroyed()) bw.close();
+      if (err) reject(new Error(err));
+      else resolve(url);
+    };
+    const check = (e, url) => {
+      if (!String(url).startsWith(redirect)) return;
+      e.preventDefault();
+      finish(null, url);
+    };
+    wc.on('will-navigate', check);
+    wc.on('will-redirect', check);
+    wc.on('will-frame-navigate', (e) => e.isMainFrame || check(e, e.url));
+    wc.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith(redirect)) finish(null, url);
+      return { action: 'deny' };
+    });
+    wc.on('did-fail-load', (_e, code, _desc, url, isMainFrame) => {
+      if (isMainFrame && code !== -3 && !done) finish('Authorization page could not be loaded.');
+    });
+    wc.on('did-finish-load', () => {
+      if (done) return;
+      if (interactive) bw.show();
+      else if (details.abortOnLoadForNonInteractive !== false) finish('User interaction required.');
+    });
+    bw.on('closed', () => finish('The user did not approve access.'));
+    if (!interactive) timer = setTimeout(() => finish('User interaction required.'), details.timeoutMsForNonInteractive || 30000);
+    let url;
+    try {
+      url = new URL(details.url).href;
+    } catch {
+      return finish('Invalid url.');
+    }
+    wc.loadURL(url).catch(() => {});
+  });
+}
+
+const identityApi = {
+  launchWebAuthFlow,
+  getAuthToken: () => {
+    throw new Error('The user is not signed in.');
+  },
+  getProfileUserInfo: () => ({ email: '', id: '' }),
+  getAccounts: () => [],
+  removeCachedAuthToken: () => {},
+  clearAllCachedAuthTokens: () => {},
+};
+
 const runtimeApi = {
   openOptionsPage: (ctx) => {
     if (!openOptions(ctx.ext)) throw new Error('Esta extensão não tem página de opções.');
@@ -1072,6 +1141,7 @@ const API = {
   commands: commandsApi,
   sidePanel: sidePanelApi,
   privacy: privacyApi,
+  identity: identityApi,
   runtime: runtimeApi,
 };
 

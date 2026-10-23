@@ -276,6 +276,8 @@ function installApis(bridge) {
   namespace('permissions', ['contains', 'getAll', 'request', 'remove'], ['onAdded', 'onRemoved']);
   namespace('commands', ['getAll'], ['onCommand']);
   namespace('sidePanel', ['setPanelBehavior', 'getPanelBehavior', 'setOptions', 'getOptions', 'open']);
+  const identity = namespace('identity', ['launchWebAuthFlow', 'getAuthToken', 'getProfileUserInfo', 'getAccounts', 'removeCachedAuthToken', 'clearAllCachedAuthTokens'], ['onSignInChanged']);
+  identity.getRedirectURL = (p = '') => `https://${chrome.runtime.id}.chromiumapp.org/${String(p).replace(/^\/+/, '')}`;
 
   // chrome.privacy: Kitty keeps its own protections; extensions may read them
   // and their changes are remembered but don't override Kitty's settings.
@@ -303,6 +305,17 @@ function installApis(bridge) {
       if (query.type && query.type !== type) return [];
       return [globalThis];
     };
+  }
+  // Chromium also gives extensions `browser`, sharing chrome's namespaces but
+  // not the ones added here (webextension-polyfill uses it as is).
+  if (globalThis.browser && typeof globalThis.browser === 'object' && globalThis.browser !== chrome) {
+    for (const ns of Object.keys(chrome)) {
+      if (!(ns in globalThis.browser)) {
+        try {
+          globalThis.browser[ns] = chrome[ns];
+        } catch {}
+      }
+    }
   }
   if (!bridge.isWorker) {
     // Which kind of page this is (popup, tab…), for getViews.
