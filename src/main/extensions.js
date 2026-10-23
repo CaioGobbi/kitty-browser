@@ -93,7 +93,7 @@ function localized(entry, key) {
   return value;
 }
 
-async function load(entry) {
+async function load(entry, { waitForWorker = true } = {}) {
   loadErrors.delete(entry.id);
   let ext;
   try {
@@ -103,7 +103,8 @@ async function load(entry) {
     throw err;
   }
   if (ext.manifest.manifest_version >= 3 && ext.manifest.background?.service_worker) {
-    await ses.serviceWorkers.startWorkerForScope(`chrome-extension://${ext.id}/`).catch(() => {});
+    const started = ses.serviceWorkers.startWorkerForScope(`chrome-extension://${ext.id}/`).catch(() => {});
+    if (waitForWorker) await started;
   }
   return ext;
 }
@@ -398,7 +399,10 @@ async function init(session, { newWindow, adoptWindow, openInternal }) {
   const skip = new Set(disabledIds());
   for (const entry of discover()) {
     if (skip.has(entry.id)) continue;
-    await load(entry).catch((err) => console.error(`[kitty] extensão ${entry.id} não carregou:`, err.message));
+    // Without waiting for service workers: the windows wait for this, and a
+    // tab that starts loading before its extensions misses their
+    // document_start scripts (the Zapfire's WhatsApp hooks).
+    await load(entry, { waitForWorker: false }).catch((err) => console.error(`[kitty] extensão ${entry.id} não carregou:`, err.message));
   }
   scheduleUpdates();
 }
