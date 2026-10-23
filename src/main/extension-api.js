@@ -232,6 +232,21 @@ function matchesPattern(pattern, url) {
   return glob.test(u.pathname + u.search);
 }
 
+/**
+ * Whether a page may hold frames from an extension (its web_accessible_resources
+ * match the page). Chrome lets extension frames into pages with
+ * Cross-Origin-Embedder-Policy (they inherit it); Electron blocks them, so for
+ * these pages Kitty drops that header (see privacy.js).
+ */
+function hostsExtensionFrames(url, pageSession) {
+  if (!ses || pageSession !== ses || !/^https?:/.test(url)) return false;
+  return ses.extensions.getAllExtensions().some((ext) =>
+    (ext.manifest.web_accessible_resources || []).some((entry) =>
+      typeof entry === 'string' ? ext.manifest.manifest_version < 3 : (entry.matches || []).some((p) => matchesPattern(p, url)),
+    ),
+  );
+}
+
 const globMatch = (pattern, text) =>
   new RegExp(`^${String(pattern).split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`, 'i').test(text || '');
 
@@ -1336,6 +1351,7 @@ module.exports = {
   watchNavigation,
   clickAction,
   closePopups,
+  hostsExtensionFrames,
   contextMenuItems,
   toolbarState,
   extensionIcon,

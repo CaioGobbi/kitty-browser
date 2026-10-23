@@ -422,11 +422,14 @@ function setupSession(ses) {
   });
 
   ses.webRequest.onHeadersReceived((details, callback) => {
-    if (!data.settings.get('blockThirdPartyCookies') || !shieldsUpFor(details) || !isThirdParty(details)) {
-      return callback({});
-    }
+    const stripCookies = data.settings.get('blockThirdPartyCookies') && shieldsUpFor(details) && isThirdParty(details);
+    const relaxCoep = isDocument(details) && !isIsolated(details.responseHeaders) && require('./extension-api').hostsExtensionFrames(details.url, ses);
+    if (!stripCookies && !relaxCoep) return callback({});
     const headers = { ...details.responseHeaders };
-    for (const key of Object.keys(headers)) if (key.toLowerCase() === 'set-cookie') delete headers[key];
+    for (const key of Object.keys(headers)) {
+      const name = key.toLowerCase();
+      if ((stripCookies && name === 'set-cookie') || (relaxCoep && name === 'cross-origin-embedder-policy')) delete headers[key];
+    }
     callback({ responseHeaders: headers });
   });
 
@@ -438,6 +441,14 @@ function setupSession(ses) {
   ses.registerPreloadScript({ type: 'frame', filePath: require.resolve('@ghostery/adblocker-electron-preload') });
   ses.registerPreloadScript({ type: 'frame', filePath: path.join(__dirname, 'preload-fingerprint.js') });
   ses.registerPreloadScript({ type: 'frame', filePath: path.join(__dirname, 'preload-scriptlets.js') });
+}
+
+const isDocument = (details) => details.resourceType === 'mainFrame' || details.resourceType === 'subFrame';
+
+/** A page that is cross-origin isolated (COOP same-origin): its COEP header matters, keep it. */
+function isIsolated(headers = {}) {
+  const coop = Object.entries(headers).find(([k]) => k.toLowerCase() === 'cross-origin-opener-policy')?.[1];
+  return /^\s*same-origin\s*(;|$)/i.test(String(coop?.[0] ?? coop ?? ''));
 }
 
 function shieldsUpFor(details) {
