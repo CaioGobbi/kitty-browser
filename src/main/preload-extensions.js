@@ -320,5 +320,63 @@ function installApis(bridge) {
   if (!bridge.isWorker) {
     // Which kind of page this is (popup, tab…), for getViews.
     bridge.call('runtime.viewType', []).then((type) => (globalThis.__kittyViewType = type), () => {});
+    useOwnStorageInFrames();
+  }
+
+  // ---- an extension page in a frame inside a web page (a panel injected into
+  // a site): Chromium keeps its storage apart per site, so it wouldn't see what
+  // the extension's own pages saved. Chrome doesn't do that for extensions; here
+  // the Storage Access API hands over the extension's own storage, which
+  // arrives a moment later: until then indexedDB calls wait for it.
+  function useOwnStorageInFrames() {
+    let topOrigin = null;
+    try {
+      topOrigin = window.top.location.origin;
+    } catch {}
+    if (window.top === window || topOrigin === location.origin || typeof document.requestStorageAccess !== 'function') return;
+    const native = { indexedDB: globalThis.indexedDB, localStorage: globalThis.localStorage };
+    let own = null; // the handle; false if refused
+    const whenReady = document.requestStorageAccess({ all: true }).then(
+      (handle) => (own = handle),
+      () => (own = false),
+    );
+    const factory = () => (own ? own.indexedDB : native.indexedDB);
+
+    // An IDBOpenDBRequest stand-in that replays the real request's events.
+    const deferredRequest = (start) => {
+      const fake = new EventTarget();
+      const handlers = {};
+      let real = null;
+      for (const type of ['success', 'error', 'upgradeneeded', 'blocked']) {
+        Object.defineProperty(fake, `on${type}`, { get: () => handlers[type] || null, set: (fn) => (handlers[type] = fn) });
+      }
+      for (const prop of ['result', 'error', 'source', 'transaction']) {
+        Object.defineProperty(fake, prop, { get: () => (real ? real[prop] : prop === 'error' ? null : undefined) });
+      }
+      Object.defineProperty(fake, 'readyState', { get: () => (real ? real.readyState : 'pending') });
+      whenReady.then(() => {
+        real = start(factory());
+        for (const type of ['success', 'error', 'upgradeneeded', 'blocked']) {
+          real.addEventListener(type, (e) => {
+            const ev =
+              type === 'upgradeneeded' || type === 'blocked'
+                ? new IDBVersionChangeEvent(type, { oldVersion: e.oldVersion, newVersion: e.newVersion })
+                : new Event(type, { cancelable: e.cancelable });
+            handlers[type]?.call(fake, ev);
+            fake.dispatchEvent(ev);
+            if (ev.defaultPrevented) e.preventDefault();
+          });
+        }
+      });
+      return fake;
+    };
+    const shim = Object.create(IDBFactory.prototype, {
+      open: { value: (...args) => (own !== null ? factory().open(...args) : deferredRequest((f) => f.open(...args))) },
+      deleteDatabase: { value: (...args) => (own !== null ? factory().deleteDatabase(...args) : deferredRequest((f) => f.deleteDatabase(...args))) },
+      databases: { value: () => whenReady.then(() => factory().databases()) },
+      cmp: { value: (a, b) => native.indexedDB.cmp(a, b) },
+    });
+    Object.defineProperty(globalThis, 'indexedDB', { get: () => (own ? own.indexedDB : own === false ? native.indexedDB : shim), configurable: true });
+    Object.defineProperty(globalThis, 'localStorage', { get: () => (own ? own.localStorage : native.localStorage), configurable: true });
   }
 }

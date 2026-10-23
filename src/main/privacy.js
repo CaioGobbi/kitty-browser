@@ -334,8 +334,11 @@ function promptLabel(permission, details, parts) {
   return PROMPTED[permission] && t(PROMPTED[permission]);
 }
 
+// Extension frames inside a page ask for their own storage (preload-extensions.js).
+const isExtensionStorage = (permission, url) => permission === 'storage-access' && String(url || '').startsWith('chrome-extension://');
+
 function onPermissionRequest(webContents, permission, callback, details) {
-  if (GRANTED.has(permission)) return callback(true);
+  if (GRANTED.has(permission) || isExtensionStorage(permission, details?.requestingUrl)) return callback(true);
   const isMedia = permission === 'media';
   if (!isMedia && !(permission in PROMPTED)) return callback(false);
 
@@ -361,7 +364,7 @@ function onPermissionRequest(webContents, permission, callback, details) {
 }
 
 function onPermissionCheck(webContents, permission, requestingOrigin, details) {
-  if (GRANTED.has(permission)) return true;
+  if (GRANTED.has(permission) || isExtensionStorage(permission, requestingOrigin)) return true;
   const found = webContents ? registry.tabByWebContentsId(webContents.id) : null;
   const origin = originOf(requestingOrigin || '');
   if (!origin) return false;
