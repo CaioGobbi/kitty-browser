@@ -14,14 +14,16 @@ const { ipcRenderer, webFrame } = require('electron');
  * that intermittently leaves the player reloading the video forever — its
  * length flickering between 0:00 and the real value. With the player's data
  * left alone it never loops, so ads are dealt with as they appear instead:
- * muted, played at 16× and skipped as soon as YouTube offers the button. This
+ * muted, hidden and skipped as soon as YouTube offers the button. They play
+ * at normal speed: YouTube holds the video until an ad would be skippable in
+ * real time anyway, and fast-forwarded ads make it show its ad blocker wall. This
  * runs in the preload's isolated world, invisible to YouTube's scripts, and
  * the skip button gets a real click from the main process — YouTube ignores
  * clicks made by page scripts.
  */
 function youtubeAdSkipper() {
   const SKIP_BUTTONS = '.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-skip-button-container button';
-  let saved = null; // the viewer's own sound and speed, restored after the ad
+  let saved = null; // the viewer's own sound, restored after the ad
   let lastClick = 0;
 
   const tick = () => {
@@ -32,14 +34,12 @@ function youtubeAdSkipper() {
     if (!player.classList.contains('ad-showing')) {
       if (saved) {
         video.muted = saved.muted;
-        video.playbackRate = saved.rate;
         saved = null;
       }
       return;
     }
-    saved ??= { muted: video.muted, rate: video.playbackRate };
+    saved ??= { muted: video.muted };
     video.muted = true;
-    if (video.playbackRate !== 16) video.playbackRate = 16;
 
     const button = document.querySelector(SKIP_BUTTONS);
     const box = button?.getBoundingClientRect();

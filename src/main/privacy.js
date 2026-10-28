@@ -215,7 +215,7 @@ function isYoutubeTab(url) {
 }
 
 /**
- * While the ad skipper fast-forwards an ad, nothing of it is shown: the video,
+ * While an ad plays, nothing of it is shown: the video,
  * its overlays and the player controls go invisible (still clickable, so the
  * real "Skip" click lands) and the player stays black until the video starts.
  * The video is hidden with visibility, not opacity: opacity 0 lifted it above
@@ -248,11 +248,14 @@ function isYoutubeAdReport(url) {
  * What YouTube checks to detect an ad blocker: ad_status.js (sets
  * google_ad_status) and Google's ad pings (pagead/id, viewthroughconversion,
  * 1p-user-list, lvz). Blocked, YouTube shows "Ad blockers are not allowed".
- * Kitty plays the ads (fast-forwarded), so in YouTube tabs these go through.
- * (ad_status.js can't be answered locally: YouTube's CSP refuses a data: script.)
+ * YouTube's own playback reports (log_event, generate_204, stats/qoe) count
+ * too: without them it sees no ad being played. Kitty plays the ads (hidden
+ * and muted), so in YouTube tabs all of these go through. (ad_status.js can't
+ * be answered locally: YouTube's CSP refuses a data: script.)
  */
 function isYoutubeAdSignal(url) {
   return (
+    /^https:\/\/(www\.|m\.)?youtube\.com\//.test(url) ||
     /^https:\/\/(googleads\.g\.doubleclick\.net|www\.google\.[a-z.]+)\/pagead\//.test(url) ||
     /^https:\/\/static\.doubleclick\.net\/instream\/ad_status\.js(\?|$)/.test(url)
   );
