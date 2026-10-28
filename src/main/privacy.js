@@ -206,6 +206,14 @@ function fingerprintExceptionsFor(topUrl) {
 
 const YOUTUBE = /(^|\.)youtube\.com$/;
 
+function isYoutubeTab(url) {
+  try {
+    return YOUTUBE.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * While the ad skipper fast-forwards an ad, nothing of it is shown: the video,
  * its overlays and the player controls go invisible (still clickable, so the
@@ -234,6 +242,20 @@ const YOUTUBE_AD_CSS = `
  */
 function isYoutubeAdReport(url) {
   return /^https:\/\/www\.youtube\.com\/(pagead\/|api\/stats\/ads|ptracking)/.test(url);
+}
+
+/**
+ * What YouTube checks to detect an ad blocker: ad_status.js (sets
+ * google_ad_status) and Google's ad pings (pagead/id, viewthroughconversion,
+ * 1p-user-list, lvz). Blocked, YouTube shows "Ad blockers are not allowed".
+ * Kitty plays the ads (fast-forwarded), so in YouTube tabs these go through.
+ * (ad_status.js can't be answered locally: YouTube's CSP refuses a data: script.)
+ */
+function isYoutubeAdSignal(url) {
+  return (
+    /^https:\/\/(googleads\.g\.doubleclick\.net|www\.google\.[a-z.]+)\/pagead\//.test(url) ||
+    /^https:\/\/static\.doubleclick\.net\/instream\/ad_status\.js(\?|$)/.test(url)
+  );
 }
 
 /**
@@ -400,7 +422,9 @@ function setupSession(ses) {
     if (isYoutubeAdReport(details.url)) return callback({});
 
     const found = registry.tabByWebContentsId(details.webContentsId);
-    if (!found || !isShieldUp(found.tab.view.webContents.getURL())) return callback({});
+    const topUrl = found?.tab.view.webContents.getURL();
+    if (!found || !isShieldUp(topUrl)) return callback({});
+    if (isYoutubeTab(topUrl) && isYoutubeAdSignal(details.url)) return callback({});
 
     const { match, redirect } = blocker.match(fromElectronDetails(details));
     if (!match && !redirect) return callback({});
