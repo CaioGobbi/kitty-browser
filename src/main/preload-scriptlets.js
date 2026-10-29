@@ -6,17 +6,16 @@
 // can no longer intercept them. webFrame.executeJavaScript from a preload runs
 // synchronously in the page's main world, before the document's first script.
 //
-// YouTube is the exception (see youtubeAdSkipper below).
+// On YouTube there's also a fallback for ads the lists miss (youtubeAdSkipper).
 const { ipcRenderer, webFrame } = require('electron');
 
 /**
- * YouTube: the lists remove ads by editing the player's data, and in Kitty
- * that intermittently leaves the player reloading the video forever — its
- * length flickering between 0:00 and the real value. With the player's data
- * left alone it never loops, so ads are dealt with as they appear instead:
- * muted, hidden and skipped as soon as YouTube offers the button. They play
- * at normal speed: YouTube holds the video until an ad would be skippable in
- * real time anyway, and fast-forwarded ads make it show its ad blocker wall. This
+ * YouTube: the lists' scriptlets remove the ads from the player's data, so
+ * normally none plays. One that still shows (YouTube changed something the
+ * lists don't cover yet) is muted, hidden and skipped as soon as YouTube
+ * offers the button. It plays at normal speed: YouTube holds the video until
+ * an ad would be skippable in real time anyway, and fast-forwarded ads make it
+ * show its ad blocker wall. This
  * runs in the preload's isolated world, invisible to YouTube's scripts, and
  * the skip button gets a real click from the main process — YouTube ignores
  * clicks made by page scripts.

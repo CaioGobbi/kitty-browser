@@ -263,8 +263,9 @@ function isYoutubeAdSignal(url) {
 
 /**
  * Scriptlets for a frame, asked synchronously by preload-scriptlets.js so they
- * run before the page's own scripts. On YouTube the lists' scriptlets are
- * replaced by Kitty's ad skipper (see preload-scriptlets.js).
+ * run before the page's own scripts. On YouTube they take the ads out of the
+ * player's data; Kitty's ad skipper stays as a fallback for an ad that still
+ * shows (see preload-scriptlets.js).
  */
 function scriptletsFor(webContentsId, frameUrl) {
   const none = { scripts: [], adSkipper: false };
@@ -274,7 +275,6 @@ function scriptletsFor(webContentsId, frameUrl) {
   const top = found ? found.tab.view.webContents.getURL() || frameUrl : frameUrl;
   if (!isShieldUp(top)) return none;
   const { hostname, domain } = Request.fromRawDetails({ url: frameUrl });
-  if (YOUTUBE.test(hostname)) return { scripts: [], adSkipper: true };
   const { active, scripts } = blocker.getCosmeticsFilters({
     url: frameUrl,
     hostname,
@@ -290,7 +290,7 @@ function scriptletsFor(webContentsId, frameUrl) {
   // side by side in the page's global scope, a later scriptlet overwrites an
   // earlier one's helpers and its Function.prototype.toString proxy recurses
   // forever. Wrapping each one keeps its helpers private.
-  return { scripts: scripts.map((script) => `(() => {\n${script}\n})();`), adSkipper: false };
+  return { scripts: scripts.map((script) => `(() => {\n${script}\n})();`), adSkipper: YOUTUBE.test(hostname) };
 }
 
 // ---------------------------------------------------------------------------
