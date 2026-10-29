@@ -61,6 +61,61 @@ function youtubeAdSkipper() {
   else document.addEventListener('readystatechange', start, { once: true });
 }
 
+/**
+ * YouTube, page world: on some accounts YouTube answers a video with ads taken
+ * out by "Ad blockers violate YouTube's Terms of Service" (status ERROR). The
+ * lists already handle that wall in uBlock's way, by tagging the player's
+ * client with another name (channel, lactmilli…) and loading the video again,
+ * but only for the older UNPLAYABLE answer. This does the same for ERROR,
+ * trying the next name each time, until the video plays.
+ */
+function youtubeWallRetry() {
+  const NAMES = ['lactmilli', 'channel', 'inline', 'yahi'];
+  const TAG = new RegExp(`; (${NAMES.join('|')})\\b`);
+  const tried = new Map(); // video id → names already tried
+  let last = 0;
+  let hidden = null; // the wall's box, shown again on the next page
+  document.addEventListener('yt-navigate-start', () => {
+    if (hidden) hidden.style.display = '';
+    hidden = null;
+  });
+  setInterval(() => {
+    if (Date.now() - last < 1500) return; // the new answer is still on its way
+    const player = document.getElementById('movie_player');
+    const response = player?.getPlayerResponse?.();
+    const status = response?.playabilityStatus;
+    const id = response?.videoDetails?.videoId || new URLSearchParams(location.search).get('v');
+    const wall = document.getElementById('error-screen');
+    if (status?.status === 'OK' && tried.has(id) && wall) {
+      // Playing again, but the page keeps the wall or error over the player.
+      document.querySelector('ytd-watch-flexy[player-unavailable]')?.removeAttribute('player-unavailable');
+      if (wall.style.display !== 'none') {
+        wall.style.display = 'none';
+        hidden = wall;
+      }
+      return;
+    }
+    // The wall (ERROR), or "This content isn't available" pointing to the ad
+    // blocker help page (UNPLAYABLE), which a name YouTube refuses gets.
+    const blocked =
+      (status?.status === 'ERROR' && status.errorScreen?.enforcementMessageViewModel) ||
+      (status?.status === 'UNPLAYABLE' && JSON.stringify(status.errorScreen || {}).includes('youtube/answer/3037019'));
+    if (!blocked) return;
+    const client = window.ytcfg?.data_?.INNERTUBE_CONTEXT?.client;
+    if (!id || !client?.userAgent) return;
+    const used = tried.get(id) || 0;
+    if (used >= NAMES.length) return;
+    tried.set(id, used + 1);
+    last = Date.now();
+    const base = client.userAgent.replace(TAG, '');
+    const head = base.match(/Mozilla\/5\.0 \([^)]+/)?.[0];
+    if (!head) return;
+    client.userAgent = base.replace(head, `${head}; ${NAMES[used]}`);
+    const start = parseInt(new URLSearchParams(location.search).get('t'), 10) || 0;
+    player.loadVideoById(id, start);
+  }, 500);
+}
+
 if (/^https?:$/.test(location.protocol)) {
   let shields = { scripts: [], adSkipper: false };
   try {
@@ -71,5 +126,8 @@ if (/^https?:$/.test(location.protocol)) {
   for (const script of shields.scripts) {
     webFrame.executeJavaScript(script).catch(() => {});
   }
-  if (shields.adSkipper && window === window.top) youtubeAdSkipper();
+  if (shields.adSkipper && window === window.top) {
+    webFrame.executeJavaScript(`(${youtubeWallRetry})();`).catch(() => {});
+    youtubeAdSkipper();
+  }
 }
