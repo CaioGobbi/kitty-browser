@@ -64,10 +64,10 @@ function youtubeAdSkipper() {
 /**
  * YouTube, page world: on some accounts YouTube answers a video with ads taken
  * out by "Ad blockers violate YouTube's Terms of Service" (status ERROR). The
- * lists already handle that wall in uBlock's way, by tagging the player's
- * client with another name (channel, lactmilli…) and loading the video again,
- * but only for the older UNPLAYABLE answer. This does the same for ERROR,
- * trying the next name each time, until the video plays.
+ * lists get past that wall by tagging the player's client with another name
+ * (channel, lactmilli…) and loading the video again, but their script for it
+ * only knows the older UNPLAYABLE answer (and is left out, see privacy.js).
+ * This does it for both, trying the next name each time, until the video plays.
  */
 function youtubeWallRetry() {
   const NAMES = ['lactmilli', 'channel', 'inline', 'yahi'];

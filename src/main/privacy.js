@@ -290,7 +290,13 @@ function scriptletsFor(webContentsId, frameUrl) {
   // side by side in the page's global scope, a later scriptlet overwrites an
   // earlier one's helpers and its Function.prototype.toString proxy recurses
   // forever. Wrapping each one keeps its helpers private.
-  return { scripts: scripts.map((script) => `(() => {\n${script}\n})();`), adSkipper: YOUTUBE.test(hostname) };
+  const youtube = YOUTUBE.test(hostname);
+  // On YouTube, uBlock's script that reloads the video under another client
+  // name (it rewrites YouTube's "serverContract" script) is left out: it also
+  // reloads while the video is still buffering, undoing a name that works and
+  // adding seconds. Kitty's youtubeWallRetry does that job instead.
+  const kept = youtube ? scripts.filter((script) => !script.includes('serverContract')) : scripts;
+  return { scripts: kept.map((script) => `(() => {\n${script}\n})();`), adSkipper: youtube };
 }
 
 // ---------------------------------------------------------------------------
