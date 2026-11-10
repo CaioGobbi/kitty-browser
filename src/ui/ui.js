@@ -165,16 +165,24 @@ function applyLayout() {
 }
 
 let lastLayout = '';
+let barHeight = 30; // last measured height of the bookmarks bar
 function reportLayout() {
   const vertical = isVertical();
   const height = Math.ceil(chrome.getBoundingClientRect().height);
   const left = vertical ? Math.ceil(sidebar.getBoundingClientRect().width) : 0;
   const r = (vertical ? sidebar : tabstrip).getBoundingClientRect();
   const strip = { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height), vertical };
-  const key = JSON.stringify([height, left, strip]);
+  // The bookmarks bar can depend on the tab ("only on the new tab"): main uses
+  // this to place a tab at its final height right away when switching tabs,
+  // instead of resizing the page a moment later (a visible jump on YouTube).
+  const shown = !bookmarksBar.hidden;
+  if (shown) barHeight = Math.ceil(bookmarksBar.getBoundingClientRect().height);
+  const mode = childrenOf(null).length === 0 ? 'never' : uiSettings.bookmarksBar;
+  const bar = { mode, height: barHeight, shown };
+  const key = JSON.stringify([height, left, strip, bar]);
   if (key === lastLayout) return;
   lastLayout = key;
-  api.setChrome({ height, left, strip });
+  api.setChrome({ height, left, strip, bar });
 }
 
 const layoutObserver = new ResizeObserver(() => reportLayout());
@@ -763,6 +771,7 @@ function renderBookmarks() {
   bookmarksBar.hidden = top.length === 0 || mode === 'never' || (mode === 'newtab' && !onNewTab);
   bookmarksBar.replaceChildren(...top.map((b) => (isFolderItem(b) ? folderButton(b) : bookmarkButton(b))));
   if (openPopup === folderPanel) renderFolderPanel();
+  reportLayout();
 }
 
 // Right click: on a bookmark or folder, or on empty space (to add one).

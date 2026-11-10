@@ -226,15 +226,31 @@ class KittyWindow {
     // With tabs on the side the UI is L-shaped, so its view covers the whole
     // window and the page goes on top of it; a dropdown brings the UI back up.
     const left = this.chromeLeft;
-    this.ui.setBounds({ x: 0, y: 0, width, height: this.overlay || left ? height : this.chromeHeight });
-    tab?.view.setBounds({ x: left, y: this.chromeHeight, width: Math.max(0, width - left), height: Math.max(0, height - this.chromeHeight) });
-    const top = this.overlay || !left ? this.ui : tab?.view;
+    const top = this.chromeTop(tab);
+    this.ui.setBounds({ x: 0, y: 0, width, height: this.overlay || left ? height : top });
+    tab?.view.setBounds({ x: left, y: top, width: Math.max(0, width - left), height: Math.max(0, height - top) });
+    const front = this.overlay || !left ? this.ui : tab?.view;
     const children = this.win.contentView.children;
-    if (top && children.at(-1) !== top) this.win.contentView.addChildView(top); // already a child: just moves to the top
+    if (front && children.at(-1) !== front) this.win.contentView.addChildView(front); // already a child: just moves to the top
+  }
+
+  /**
+   * Height of the UI above `tab`. The UI reports its height for the tab it
+   * shows, but with the bookmarks bar "only on the new tab" a switched-to tab
+   * needs a different one: compute it now, so the page doesn't get resized
+   * twice (once to the old height, then to the right one).
+   */
+  chromeTop(tab) {
+    const bar = this.bar;
+    if (!bar || !tab) return this.chromeHeight;
+    const url = tab.pendingUrl || tab.view.webContents.getURL() || tab.startUrl || '';
+    const shows = bar.mode === 'always' || (bar.mode === 'newtab' && url.startsWith('kitty://newtab'));
+    return Math.max(40, this.chromeHeight - (bar.shown ? bar.height : 0) + (shows ? bar.height : 0));
   }
 
   /** The UI asks for more room (bars, the side tab strip) or the whole window (dropdowns). */
-  setChrome({ height, left, overlay, strip }) {
+  setChrome({ height, left, overlay, strip, bar }) {
+    if (bar && Number.isFinite(bar.height)) this.bar = { mode: bar.mode, height: Math.max(0, Math.round(bar.height)), shown: !!bar.shown };
     if (Number.isFinite(height)) this.chromeHeight = Math.max(40, Math.min(400, Math.round(height)));
     if (Number.isFinite(left)) this.chromeLeft = Math.max(0, Math.min(600, Math.round(left)));
     if (typeof overlay === 'boolean') this.overlay = overlay;
