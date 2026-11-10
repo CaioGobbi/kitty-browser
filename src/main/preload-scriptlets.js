@@ -74,25 +74,16 @@ function youtubeWallRetry() {
   const TAG = new RegExp(`; (${NAMES.join('|')})\\b`);
   const tried = new Map(); // video id → names already tried
   let last = 0;
-  let hidden = null; // the wall's box, shown again on the next page
-  document.addEventListener('yt-navigate-start', () => {
-    if (hidden) hidden.style.display = '';
-    hidden = null;
-  });
   setInterval(() => {
     if (Date.now() - last < 1500) return; // the new answer is still on its way
     const player = document.getElementById('movie_player');
     const response = player?.getPlayerResponse?.();
     const status = response?.playabilityStatus;
     const id = response?.videoDetails?.videoId || new URLSearchParams(location.search).get('v');
-    const wall = document.getElementById('error-screen');
-    if (status?.status === 'OK' && tried.has(id) && wall) {
-      // Playing again, but the page keeps the wall or error over the player.
+    if (status?.status === 'OK' && tried.has(id)) {
+      // Playing again, but the page keeps the player marked unavailable. (The
+      // wall itself never shows: YOUTUBE_WALL_CSS hides it from the start.)
       document.querySelector('ytd-watch-flexy[player-unavailable]')?.removeAttribute('player-unavailable');
-      if (wall.style.display !== 'none') {
-        wall.style.display = 'none';
-        hidden = wall;
-      }
       return;
     }
     // The wall (ERROR), or "This content isn't available" pointing to the ad
@@ -113,8 +104,21 @@ function youtubeWallRetry() {
     client.userAgent = base.replace(head, `${head}; ${NAMES[used]}`);
     const start = parseInt(new URLSearchParams(location.search).get('t'), 10) || 0;
     player.loadVideoById(id, start);
-  }, 500);
+  }, 100);
 }
+
+/**
+ * YouTube's ad blocker wall, hidden before it can show: it used to flash on
+ * screen until youtubeWallRetry replaced it, and again when leaving the page.
+ * A user stylesheet, added before the page exists, which the page can't remove.
+ */
+const YOUTUBE_WALL_CSS = `
+ytd-enforcement-message-view-model,
+#error-screen:has(ytd-enforcement-message-view-model),
+yt-playability-error-supported-renderers:has(ytd-enforcement-message-view-model),
+tp-yt-paper-dialog:has(ytd-enforcement-message-view-model),
+body:has(tp-yt-paper-dialog ytd-enforcement-message-view-model) tp-yt-iron-overlay-backdrop { display: none !important; }
+`;
 
 if (/^https?:$/.test(location.protocol)) {
   let shields = { scripts: [], adSkipper: false };
@@ -127,6 +131,7 @@ if (/^https?:$/.test(location.protocol)) {
     webFrame.executeJavaScript(script).catch(() => {});
   }
   if (shields.adSkipper && window === window.top) {
+    webFrame.insertCSS(YOUTUBE_WALL_CSS, { cssOrigin: 'user' });
     webFrame.executeJavaScript(`(${youtubeWallRetry})();`).catch(() => {});
     youtubeAdSkipper();
   }
