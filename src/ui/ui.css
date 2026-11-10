@@ -782,7 +782,7 @@ body.private #private-badge {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.download.done .name {
+.download.done {
   cursor: pointer;
 }
 .download .status {

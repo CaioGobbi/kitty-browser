@@ -116,7 +116,10 @@ function action(id, what) {
   const item = live.get(entry.id);
   switch (what) {
     case 'open':
-      if (entry.state === 'completed') shell.openPath(entry.path);
+      // A file moved or deleted since: show the downloads folder instead.
+      if (entry.state !== 'completed') break;
+      if (fs.existsSync(entry.path)) shell.openPath(entry.path);
+      else shell.openPath(app.getPath('downloads'));
       break;
     case 'show':
       if (fs.existsSync(entry.path)) shell.showItemInFolder(entry.path);

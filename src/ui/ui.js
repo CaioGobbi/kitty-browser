@@ -1105,7 +1105,14 @@ function renderDownloads() {
       const ext = (d.filename.split('.').pop() || '').slice(0, 4);
       const info = el('div', 'info');
       const name = el('div', 'name', d.filename);
-      if (done) name.addEventListener('click', () => api.downloadAction({ id: d.id, what: 'open' }));
+      // Clicking anywhere on a finished download opens the file, as in Chrome.
+      if (done) {
+        row.title = t('Abrir');
+        row.addEventListener('click', () => {
+          api.downloadAction({ id: d.id, what: 'open' });
+          closePopup();
+        });
+      }
       info.append(name, el('div', 'status', downloadStatus(d)));
       if (d.state === 'progressing' && d.total) {
         const bar = el('div', 'bar');
@@ -1119,7 +1126,10 @@ function renderDownloads() {
         const b = el('button', 'icon-btn small');
         b.innerHTML = icon;
         b.title = title;
-        b.addEventListener('click', () => api.downloadAction({ id: d.id, what }));
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          api.downloadAction({ id: d.id, what });
+        });
         actions.push(b);
       };
       if (d.state === 'progressing') {
