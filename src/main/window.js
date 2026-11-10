@@ -353,6 +353,10 @@ class KittyWindow {
       tab.owner.sendState();
     });
     wc.on('did-navigate', (_e, url) => {
+      // Trackpad pinch zooms the page visually (like Safari and Chrome),
+      // without reflowing it. Electron starts with this locked at 1x, and a
+      // new renderer can drop the limits, so they're set on every navigation.
+      wc.setVisualZoomLevelLimits(1, 3).catch(() => {});
       // Chromium only reports a favicon when it changes, so a reload keeps the
       // old one; it's cleared only when the tab moves to another site.
       if (originOf(url) !== tab.faviconOrigin) tab.favicon = null;
